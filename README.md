@@ -114,11 +114,27 @@ pytest
 python -m app.evaluation.evaluate
 ```
 
-运行评测前需要先导入知识：
+评测脚本会自动重新 ingest 当前 `knowledge/`，然后输出一份结构化 JSON 报告，包含：
 
-```bash
-python scripts/ingest.py
-```
+- `summary.hitAt3`：期望文档是否进入前 3 个 citation
+- `summary.hitAt5`：期望文档是否进入前 5 个 citation
+- `summary.citationRelevance`：首个 citation 是否就是期望文档
+- `summary.schemaValidity`：回答是否通过 response schema 校验
+- `summary.keywordCoverage`：期望关键词在 `rewrittenKeywordQuery` 中的覆盖比例
+
+每个 case 还会输出：
+
+- 期望命中文档
+- 实际 citation 列表
+- `rewrittenKeywordQuery`
+- `rewrittenSemanticQuery`
+
+解读建议：
+
+- `hitAt3` 下降，通常优先检查 query rewrite、service filter 或 rerank
+- `hitAt5` 正常但 `citationRelevance` 下降，通常说明召回还在，但排序变差
+- `keywordCoverage` 下降，通常说明 incident 输入理解或 query rewrite 退化
+- `schemaValidity` 不为 `1.0`，说明回答层或 response schema 出现回归
 
 ## 后续路线
 
