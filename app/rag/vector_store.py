@@ -21,8 +21,8 @@ class SQLiteVectorStore:
             connection.executemany(
                 """
                 INSERT INTO chunks (
-                    id, document_id, title, path, doc_type, tags, heading, content, embedding
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    id, document_id, title, path, doc_type, service, tags, heading, heading_level, content, embedding
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 [
                     (
@@ -31,8 +31,10 @@ class SQLiteVectorStore:
                         chunk.metadata.title,
                         chunk.metadata.path,
                         chunk.metadata.docType,
+                        chunk.metadata.service,
                         json.dumps(chunk.metadata.tags, ensure_ascii=False),
                         chunk.heading,
+                        chunk.headingLevel,
                         chunk.content,
                         json.dumps(embeddings[chunk.id]),
                     )

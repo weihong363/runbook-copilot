@@ -48,6 +48,8 @@ class IncidentAnalyzeResponse(BaseModel):
 class IngestResponse(BaseModel):
     indexedDocuments: int
     indexedChunks: int
+    indexedByDocType: dict[str, int] = Field(default_factory=dict)
+    emptySectionsMerged: int = 0
 
 
 class FeedbackRequest(BaseModel):

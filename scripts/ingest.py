@@ -6,8 +6,14 @@ from app.rag.vector_store import SQLiteVectorStore
 def main() -> None:
     settings = getSettings()
     store = SQLiteVectorStore(settings.databasePath)
-    documents, chunks = ingestKnowledge(settings.knowledgeDir, store, settings.vectorDimension)
-    print(f"已导入文档 {documents} 份，chunk {chunks} 个")
+    stats = ingestKnowledge(settings.knowledgeDir, store, settings.vectorDimension)
+    print(
+        "已导入文档 {documents} 份，chunk {chunks} 个，按类型统计 {docTypes}".format(
+            documents=stats["indexedDocuments"],
+            chunks=stats["indexedChunks"],
+            docTypes=stats["indexedByDocType"],
+        )
+    )
 
 
 if __name__ == "__main__":

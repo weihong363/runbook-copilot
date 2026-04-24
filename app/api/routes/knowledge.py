@@ -13,7 +13,7 @@ def ingest() -> IngestResponse:
     settings = getSettings()
     try:
         store = SQLiteVectorStore(settings.databasePath)
-        documentCount, chunkCount = ingestKnowledge(settings.knowledgeDir, store, settings.vectorDimension)
+        stats = ingestKnowledge(settings.knowledgeDir, store, settings.vectorDimension)
     except Exception as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
-    return IngestResponse(indexedDocuments=documentCount, indexedChunks=chunkCount)
+    return IngestResponse(**stats)

@@ -35,19 +35,21 @@
 
 目标：提升 runbook 命中率，让检索结果更符合工程排障场景。
 
+状态：已完成第一轮实现
+
 TODO：
 
-- [ ] 明确 chunk metadata 结构，补齐并统一字段命名
-- [ ] 增加 `doc_type`、`tags`、`service` 等可用于检索和过滤的 metadata
-- [ ] 优化 markdown 解析规则，处理标题前导说明、空 section、短 section
-- [ ] 给 ingest 增加导入统计信息，便于调试索引内容
-- [ ] 为 hybrid retrieval 增加更明确的 score merge 规则
-- [ ] 增加简单 rerank 规则，优先考虑以下信息：
+- [x] 明确 chunk metadata 结构，补齐并统一字段命名
+- [x] 增加 `doc_type`、`tags`、`service` 等可用于检索和过滤的 metadata
+- [x] 优化 markdown 解析规则，处理标题前导说明、空 section、短 section
+- [x] 给 ingest 增加导入统计信息，便于调试索引内容
+- [x] 为 hybrid retrieval 增加更明确的 score merge 规则
+- [x] 增加简单 rerank 规则，优先考虑以下信息：
   - 服务名精确命中
   - 错误码精确命中
   - 依赖名命中
   - section 标题命中
-- [ ] 为 retrieval 增加更多样例测试，覆盖：
+- [x] 为 retrieval 增加更多样例测试，覆盖：
   - 服务名命中
   - 错误码命中
   - dependency 命中

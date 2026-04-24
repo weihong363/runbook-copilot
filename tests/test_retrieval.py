@@ -19,3 +19,62 @@ def testHybridRetrieverFindsRelevantChunk(tmp_path: Path) -> None:
 
     assert results
     assert "DB_POOL_EXHAUSTED" in results[0]["content"]
+
+
+def testHybridRetrieverBoostsExactServiceMatch(tmp_path: Path) -> None:
+    knowledgeDir = tmp_path / "knowledge"
+    knowledgeDir.mkdir()
+    (knowledgeDir / "runbook-payment-service.md").write_text(
+        "# payment-service Runbook\nTags: payment-service, postgres\n\n## 连接池耗尽\n处理 remaining connection slots are reserved。",
+        encoding="utf-8",
+    )
+    (knowledgeDir / "runbook-order-service.md").write_text(
+        "# order-service Runbook\nTags: order-service, postgres\n\n## 连接池耗尽\n处理 remaining connection slots are reserved。",
+        encoding="utf-8",
+    )
+    store = SQLiteVectorStore(tmp_path / "db.sqlite3")
+    ingestKnowledge(knowledgeDir, store, 64)
+
+    results = HybridRetriever(store, 64).search("payment-service remaining connection slots are reserved", 3)
+
+    assert results[0]["service"] == "payment-service"
+
+
+def testHybridRetrieverBoostsDependencyAndErrorCode(tmp_path: Path) -> None:
+    knowledgeDir = tmp_path / "knowledge"
+    knowledgeDir.mkdir()
+    (knowledgeDir / "runbook-checkout-api.md").write_text(
+        "# checkout-api Runbook\nTags: checkout-api, redis\n\n## Redis 连接失败\n出现 redis connection refused 时检查缓存实例状态。",
+        encoding="utf-8",
+    )
+    (knowledgeDir / "runbook-checkout-api-db.md").write_text(
+        "# checkout-api 数据库 Runbook\nTags: checkout-api, postgres\n\n## 数据库超时\n出现 DB_POOL_EXHAUSTED 时检查连接池。",
+        encoding="utf-8",
+    )
+    store = SQLiteVectorStore(tmp_path / "db.sqlite3")
+    ingestKnowledge(knowledgeDir, store, 64)
+
+    dependencyResults = HybridRetriever(store, 64).search("checkout-api redis connection refused", 3)
+    errorCodeResults = HybridRetriever(store, 64).search("checkout-api DB_POOL_EXHAUSTED", 3)
+
+    assert dependencyResults[0]["heading"] == "Redis 连接失败"
+    assert errorCodeResults[0]["content"].find("DB_POOL_EXHAUSTED") >= 0
+
+
+def testHybridRetrieverPrefersRunbookOverIncidentNoise(tmp_path: Path) -> None:
+    knowledgeDir = tmp_path / "knowledge"
+    knowledgeDir.mkdir()
+    (knowledgeDir / "incident-payment-service.md").write_text(
+        "# payment-service incident record\nTags: payment-service, postgres\n\n## 事故背景\n记录本次故障影响范围。",
+        encoding="utf-8",
+    )
+    (knowledgeDir / "runbook-payment-service.md").write_text(
+        "# payment-service Runbook\nTags: payment-service, postgres\n\n## 数据库连接耗尽\n处理 remaining connection slots are reserved 和活跃 session。",
+        encoding="utf-8",
+    )
+    store = SQLiteVectorStore(tmp_path / "db.sqlite3")
+    ingestKnowledge(knowledgeDir, store, 64)
+
+    results = HybridRetriever(store, 64).search("payment-service remaining connection slots are reserved", 3)
+
+    assert results[0]["doc_type"] == "runbook"

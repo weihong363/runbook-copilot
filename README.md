@@ -5,10 +5,10 @@
 ## 当前目标
 
 - 从 `knowledge/` 下的本地 Markdown 文档导入知识。
-- 按 Markdown 标题分块，提取标题、路径、文档类型和 tags。
+- 按 Markdown 标题分块，提取标题、路径、文档类型、service 和 tags。
 - 使用本地哈希向量 + SQLite 做最小向量检索。
 - 使用 BM25 做关键词检索。
-- 合并向量和 BM25 结果，生成结构化排障响应。
+- 合并向量和 BM25 结果，并基于服务名、错误码、依赖名和 section 标题做简单 rerank。
 - 提供反馈接口和离线 JSONL 评测脚本。
 
 ## 架构
@@ -67,6 +67,11 @@ curl -X POST http://127.0.0.1:8000/api/knowledge/ingest
 
 读取 `knowledge/` 下的 Markdown 文件并重建本地索引。
 
+响应还会包含：
+
+- `indexedByDocType`：按文档类型统计的导入数量
+- `emptySectionsMerged`：被合并的超短小节数量
+
 ### `POST /api/incidents/analyze`
 
 请求示例：
@@ -113,4 +118,4 @@ python scripts/ingest.py
 - 接入 LLM 生成器，并强制答案只引用检索结果。
 - 扩展 Markdown frontmatter 元数据解析。
 - 增加历史事故数据集和 recall/precision 评测指标。
-- 增加服务维度过滤、文档类型过滤和更细粒度 reranking。
+- 增加更细粒度的服务过滤、文档类型过滤和可解释 rerank reason。

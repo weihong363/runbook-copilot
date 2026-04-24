@@ -59,6 +59,8 @@ def _searchText(document: dict) -> str:
         [
             str(document.get("title", "")),
             str(document.get("heading", "")),
+            str(document.get("doc_type", "")),
+            str(document.get("service", "")),
             str(document.get("tags", "")),
             str(document.get("content", "")),
         ]

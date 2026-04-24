@@ -21,8 +21,10 @@ def initializeDatabase(databasePath: Path) -> None:
                 title TEXT NOT NULL,
                 path TEXT NOT NULL,
                 doc_type TEXT NOT NULL,
+                service TEXT NOT NULL DEFAULT '',
                 tags TEXT NOT NULL,
                 heading TEXT NOT NULL,
+                heading_level INTEGER NOT NULL DEFAULT 0,
                 content TEXT NOT NULL,
                 embedding TEXT NOT NULL,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -37,3 +39,14 @@ def initializeDatabase(databasePath: Path) -> None:
             );
             """
         )
+        _ensureColumn(connection, "chunks", "service", "TEXT NOT NULL DEFAULT ''")
+        _ensureColumn(connection, "chunks", "heading_level", "INTEGER NOT NULL DEFAULT 0")
+
+
+def _ensureColumn(connection: sqlite3.Connection, table: str, name: str, definition: str) -> None:
+    columns = {
+        row["name"]
+        for row in connection.execute(f"PRAGMA table_info({table})").fetchall()
+    }
+    if name not in columns:
+        connection.execute(f"ALTER TABLE {table} ADD COLUMN {name} {definition}")
