@@ -97,6 +97,12 @@ curl -X POST http://127.0.0.1:8000/api/knowledge/ingest
 - `answer.citations`
 - `answer.nextAction`
 
+回答层当前行为：
+
+- 只在召回证据足够强时给出明确排障起点
+- 当只命中弱相关资料时，会明确标注“只是初步线索”
+- citation excerpt 会去掉 markdown 标题行，保留更稳定的正文片段
+
 ### `POST /api/feedback`
 
 记录用户对答案的评分和备注。

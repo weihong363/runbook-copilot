@@ -1,7 +1,7 @@
 import pytest
 
 from app.models.schemas import Citation, IncidentAnalyzeRequest, TroubleshootingResponse
-from app.services.incident_analyzer import extractEntities, rewriteQuery, validateIncidentInput
+from app.services.incident_analyzer import buildGroundedAnswer, extractEntities, rewriteQuery, validateIncidentInput
 
 
 def testTroubleshootingResponseSchemaIsValid() -> None:
@@ -69,3 +69,54 @@ def testValidateIncidentInputRejectsNoiseLog() -> None:
 
     with pytest.raises(ValueError):
         validateIncidentInput(request)
+
+
+def testBuildGroundedAnswerReturnsUncertainSummaryForWeakEvidence() -> None:
+    request = IncidentAnalyzeRequest(
+        alertTitle="order-service redis refused",
+        serviceName="order-service",
+        logSnippet="connection refused after deploy",
+    )
+    rewrite = rewriteQuery(request, extractEntities(request))
+    results = [
+        {
+            "id": "doc#1",
+            "title": "示例文档",
+            "path": "knowledge/example.md",
+            "heading": "背景说明",
+            "heading_level": 1,
+            "score": 0.18,
+            "content": "# 背景说明\n这里只是相邻场景线索。",
+        }
+    ]
+
+    answer = buildGroundedAnswer(request, rewrite, results)
+
+    assert "证据还不足以直接下结论" in answer.summary
+    assert "暂时不能确认根因" in answer.likelyCauses[0]
+    assert "不要直接把它当作已确认根因" in answer.steps[2]
+
+
+def testBuildGroundedAnswerUsesStableCitationExcerpt() -> None:
+    request = IncidentAnalyzeRequest(
+        alertTitle="checkout-api HTTP 500",
+        serviceName="checkout-api",
+        logSnippet="DB_POOL_EXHAUSTED timeout acquiring connection",
+    )
+    rewrite = rewriteQuery(request, extractEntities(request))
+    results = [
+        {
+            "id": "doc#2",
+            "title": "checkout-api Runbook",
+            "path": "knowledge/runbook-checkout-api.md",
+            "heading": "处理步骤",
+            "heading_level": 2,
+            "score": 0.62,
+            "content": "## 处理步骤\n1. 检查连接池。\n2. 检查活跃连接。\n",
+        }
+    ]
+
+    answer = buildGroundedAnswer(request, rewrite, results)
+
+    assert answer.citations[0].excerpt.startswith("1. 检查连接池。")
+    assert "## 处理步骤" not in answer.citations[0].excerpt
