@@ -1,0 +1,1 @@
+{"name":"checkout-5xx","input":{"alertTitle":"checkout-api HTTP 500 错误率升高","serviceName":"checkout-api","logSnippet":"HTTP 500 DB_POOL_EXHAUSTED timeout acquiring connection","symptomDescription":"下单接口大量失败"},"expectedCitationPath":"knowledge/runbook-checkout-api.md"}
