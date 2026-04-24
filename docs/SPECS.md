@@ -368,7 +368,7 @@ MVP 使用本地 markdown 文档作为知识源，类型包括：
 
 ### 10.1 总体流程
 
-...text
+```text
 User Input
 -> Incident API
 -> Entity Extraction
@@ -380,7 +380,7 @@ User Input
 -> Answer Synthesis
 -> Structured Response with Citations
 -> Feedback / Evaluation
-...
+```
 
 ### 10.2 分层设计
 
@@ -441,7 +441,7 @@ User Input
 
 ## 11. 目录结构规范
 
-...text
+```text
 runbook-copilot/
 app/
 api/
@@ -506,7 +506,7 @@ AGENTS.md
 README.md
 requirements.txt
 .env.example
-...
+```
 
 ---
 
@@ -549,18 +549,18 @@ requirements.txt
 
 请求示例：
 
-...json
+```json
 {
 "alert_title": "PaymentService error rate > 20%",
 "service_name": "payment-service",
-"log_snippet": "org.postgresql.util.PSQLException: FATAL: remaining connection slots are reserved...",
+"log_snippet": "org.postgresql.util.PSQLException: FATAL: remaining connection slots are reserved```",
 "symptom": "recent spike in 5xx errors after deployment"
 }
-...
+```
 
 响应示例：
 
-...json
+```json
 {
 "summary": "Likely database connection exhaustion in payment-service.",
 "likely_causes": [
@@ -582,7 +582,7 @@ requirements.txt
 ],
 "next_action": "Verify whether connection pool usage increased after the latest release."
 }
-...
+```
 
 ---
 
@@ -602,18 +602,18 @@ requirements.txt
 
 ## 13.1 IncidentQuery
 
-...json
+```json
 {
 "alert_title": "string",
 "service_name": "string",
 "log_snippet": "string",
 "symptom": "string"
 }
-...
+```
 
 ## 13.2 ExtractedContext
 
-...json
+```json
 {
 "service": "string",
 "dependencies": ["string"],
@@ -622,11 +622,11 @@ requirements.txt
 "keywords": ["string"],
 "symptoms": ["string"]
 }
-...
+```
 
 ## 13.3 RetrievedDocument
 
-...json
+```json
 {
 "id": "string",
 "title": "string",
@@ -635,11 +635,11 @@ requirements.txt
 "score": 0.0,
 "snippet": "string"
 }
-...
+```
 
 ## 13.4 CopilotResponse
 
-...json
+```json
 {
 "summary": "string",
 "likely_causes": ["string"],
@@ -652,7 +652,7 @@ requirements.txt
 ],
 "next_action": "string"
 }
-...
+```
 
 ---
 

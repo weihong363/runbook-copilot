@@ -136,6 +136,27 @@ python -m app.evaluation.evaluate
 - `keywordCoverage` 下降，通常说明 incident 输入理解或 query rewrite 退化
 - `schemaValidity` 不为 `1.0`，说明回答层或 response schema 出现回归
 
+## 知识库规范
+
+知识文档编写规范在：
+
+- [KNOWLEDGE_STYLE_GUIDE.md](/Users/ironion/workspace/runbook-copilot/docs/KNOWLEDGE_STYLE_GUIDE.md)
+
+可复用模板在：
+
+- [runbook_template.md](/Users/ironion/workspace/runbook-copilot/docs/knowledge_templates/runbook_template.md)
+- [incident_template.md](/Users/ironion/workspace/runbook-copilot/docs/knowledge_templates/incident_template.md)
+- [service_template.md](/Users/ironion/workspace/runbook-copilot/docs/knowledge_templates/service_template.md)
+- [faq_template.md](/Users/ironion/workspace/runbook-copilot/docs/knowledge_templates/faq_template.md)
+
+知识库 lint：
+
+```bash
+python scripts/lint_knowledge.py
+```
+
+这个脚本会检查标题、tags、文档类型、二级标题和 service 提取情况。
+
 ## 后续路线
 
 - 接入真实 embedding 模型和 Chroma/FAISS。

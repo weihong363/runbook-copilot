@@ -147,17 +147,17 @@
 
 目标：让 `knowledge/` 中的文档逐步具备更稳定的 ingest 质量。
 
-TODO：
+状态：已完成第一轮实现
 
-- [ ] 补一份知识文档编写规范，约束标题、tags、文档类型
-- [ ] 定义推荐 markdown 模板：
+- [x] 补一份知识文档编写规范，约束标题、tags、文档类型
+- [x] 定义推荐 markdown 模板：
   - runbook
   - incident
   - service
   - faq
-- [ ] 明确建议 metadata 字段
-- [ ] 增加 ingest 前校验或 lint 脚本
-- [ ] 增加几份更接近真实场景的示例知识文档
+- [x] 明确建议 metadata 字段
+- [x] 增加 ingest 前校验或 lint 脚本
+- [x] 增加几份更接近真实场景的示例知识文档
 
 验收标准：
 
