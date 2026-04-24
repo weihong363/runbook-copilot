@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class Citation(BaseModel):
@@ -16,11 +16,45 @@ class IncidentAnalyzeRequest(BaseModel):
     logSnippet: str = Field(min_length=1, max_length=4000)
     symptomDescription: str | None = Field(default=None, max_length=1000)
 
+    @field_validator("alertTitle", "serviceName", "logSnippet", mode="before")
+    @classmethod
+    def stripRequiredText(cls, value: str) -> str:
+        if value is None:
+            raise ValueError("字段不能为空")
+        normalized = str(value).strip()
+        if not normalized:
+            raise ValueError("字段不能为空白")
+        return normalized
+
+    @field_validator("symptomDescription", mode="before")
+    @classmethod
+    def stripOptionalText(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = str(value).strip()
+        return normalized or None
+
 
 class ExtractedEntities(BaseModel):
     service: str
+    dependencies: list[str] = Field(default_factory=list)
+    exceptionTypes: list[str] = Field(default_factory=list)
     errorCodes: list[str] = Field(default_factory=list)
     keywords: list[str] = Field(default_factory=list)
+    symptomTags: list[str] = Field(default_factory=list)
+
+
+class RetrievalFilters(BaseModel):
+    service: str | None = None
+    docTypes: list[str] = Field(default_factory=list)
+    dependencies: list[str] = Field(default_factory=list)
+    errorCodes: list[str] = Field(default_factory=list)
+
+
+class QueryRewrite(BaseModel):
+    keywordQuery: str
+    semanticQuery: str
+    filters: RetrievalFilters
 
 
 class TroubleshootingResponse(BaseModel):
@@ -41,7 +75,7 @@ class TroubleshootingResponse(BaseModel):
 
 class IncidentAnalyzeResponse(BaseModel):
     entities: ExtractedEntities
-    rewrittenQuery: str
+    rewrittenQuery: QueryRewrite
     answer: TroubleshootingResponse
 
 

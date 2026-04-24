@@ -87,8 +87,10 @@ curl -X POST http://127.0.0.1:8000/api/knowledge/ingest
 
 响应包含：
 
-- `entities`：提取出的服务、错误码和关键词。
-- `rewrittenQuery`：用于检索的改写查询。
+- `entities`：提取出的服务、依赖、异常类型、错误码、关键词和症状标签。
+- `rewrittenQuery.keywordQuery`：用于 BM25 的关键词检索查询。
+- `rewrittenQuery.semanticQuery`：用于向量召回的语义查询。
+- `rewrittenQuery.filters`：用于服务名和文档类型约束的过滤条件。
 - `answer.summary`
 - `answer.likelyCauses`
 - `answer.steps`

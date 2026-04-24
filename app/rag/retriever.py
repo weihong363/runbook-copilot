@@ -1,8 +1,9 @@
 import json
 import re
 
+from app.models.schemas import QueryRewrite
 from app.rag.bm25 import BM25Index
-from app.rag.embedding import embedText
+from app.rag.embedding import cosineSimilarity, embedText
 from app.rag.vector_store import SQLiteVectorStore
 
 DEPENDENCY_TOKENS = {
@@ -26,25 +27,28 @@ class HybridRetriever:
         self.vectorStore = vectorStore
         self.dimension = dimension
 
-    def search(self, query: str, topK: int) -> list[dict]:
-        if not query.strip():
+    def search(self, query: str | QueryRewrite, topK: int) -> list[dict]:
+        if topK < 1:
+            raise ValueError("topK 必须大于 0")
+        queryBundle = _ensureQueryRewrite(query)
+        if not queryBundle.keywordQuery.strip() and not queryBundle.semanticQuery.strip():
             raise ValueError("query 不能为空")
-        chunks = self.vectorStore.allChunks()
+        chunks = _applyFilters(self.vectorStore.allChunks(), queryBundle)
         if not chunks:
             return []
-        normalizedQuery = _normalizeText(query)
-        vectorResults = self.vectorStore.search(embedText(normalizedQuery, self.dimension), topK * 3)
-        bm25Results = BM25Index(chunks).search(query, topK * 2)
-        return self._merge(vectorResults, bm25Results, normalizedQuery, topK)
+        vectorResults = _vectorSearch(chunks, queryBundle.semanticQuery, topK * 3, self.dimension)
+        bm25Results = BM25Index(chunks).search(queryBundle.keywordQuery, topK * 2)
+        return self._merge(vectorResults, bm25Results, queryBundle, topK)
 
     def _merge(
         self,
         vectorResults: list[tuple[dict, float]],
         bm25Results: list[tuple[dict, float]],
-        normalizedQuery: str,
+        queryBundle: QueryRewrite,
         topK: int,
     ) -> list[dict]:
         scores: dict[str, dict] = {}
+        normalizedQuery = _normalizeText(f"{queryBundle.keywordQuery} {queryBundle.semanticQuery}")
         for chunk, score in vectorResults:
             scores[chunk["id"]] = {"chunk": chunk, "score": 0.55 * score}
         maxBm25 = max((score for _, score in bm25Results), default=0.0) or 1.0
@@ -52,7 +56,7 @@ class HybridRetriever:
             item = scores.setdefault(chunk["id"], {"chunk": chunk, "score": 0.0})
             item["score"] += 0.45 * (score / maxBm25)
         for item in scores.values():
-            item["score"] += _rerankBoost(item["chunk"], normalizedQuery)
+            item["score"] += _rerankBoost(item["chunk"], normalizedQuery, queryBundle)
         ranked = sorted(scores.values(), key=lambda item: item["score"], reverse=True)
         return [
             {**item["chunk"], "score": round(float(item["score"]), 4)}
@@ -61,7 +65,46 @@ class HybridRetriever:
         ]
 
 
-def _rerankBoost(chunk: dict, normalizedQuery: str) -> float:
+def _ensureQueryRewrite(query: str | QueryRewrite) -> QueryRewrite:
+    if isinstance(query, QueryRewrite):
+        return query
+    normalized = str(query).strip()
+    return QueryRewrite(keywordQuery=normalized, semanticQuery=normalized, filters={})
+
+
+def _applyFilters(chunks: list[dict], queryBundle: QueryRewrite) -> list[dict]:
+    filtered = chunks
+    service = _normalizeText(queryBundle.filters.service or "")
+    if service:
+        matching = [chunk for chunk in filtered if _normalizeText(str(chunk.get("service", ""))) == service]
+        if matching:
+            filtered = matching
+    docTypes = {_normalizeText(docType) for docType in queryBundle.filters.docTypes}
+    if docTypes:
+        matching = [chunk for chunk in filtered if _normalizeText(str(chunk.get("doc_type", ""))) in docTypes]
+        if matching:
+            filtered = matching
+    return filtered
+
+
+def _vectorSearch(
+    chunks: list[dict],
+    semanticQuery: str,
+    topK: int,
+    dimension: int,
+) -> list[tuple[dict, float]]:
+    if not semanticQuery.strip():
+        return []
+    queryEmbedding = embedText(_normalizeText(semanticQuery), dimension)
+    scored: list[tuple[dict, float]] = []
+    for chunk in chunks:
+        embedding = json.loads(chunk["embedding"])
+        score = max(0.0, cosineSimilarity(queryEmbedding, embedding))
+        scored.append((chunk, score))
+    return sorted(scored, key=lambda item: item[1], reverse=True)[:topK]
+
+
+def _rerankBoost(chunk: dict, normalizedQuery: str, queryBundle: QueryRewrite) -> float:
     boost = 0.0
     queryTokens = set(_queryTokens(normalizedQuery))
     chunkTokens = set(_queryTokens(_chunkSearchText(chunk)))
@@ -73,12 +116,10 @@ def _rerankBoost(chunk: dict, normalizedQuery: str) -> float:
         boost += 0.22
     if heading and any(token in heading for token in queryTokens):
         boost += 0.08
-    errorCodes = set(ERROR_CODE_PATTERN.findall(normalizedQuery))
-    if errorCodes:
-        matchedCodes = sum(1 for code in errorCodes if code.lower() in chunkTokens)
-        boost += min(0.24, matchedCodes * 0.12)
-    dependencyMatches = len(_dependencyTokens(normalizedQuery) & chunkTokens)
-    boost += min(0.18, dependencyMatches * 0.09)
+    matchedCodes = sum(1 for code in queryBundle.filters.errorCodes if code.lower() in chunkTokens)
+    boost += min(0.24, matchedCodes * 0.12)
+    matchedDependencies = sum(1 for dependency in queryBundle.filters.dependencies if dependency in chunkTokens)
+    boost += min(0.18, matchedDependencies * 0.09)
     if docType == "runbook":
         boost += 0.04
     if headingLevel >= 2:
@@ -107,10 +148,6 @@ def _chunkSearchText(chunk: dict) -> str:
             str(chunk.get("content", "")),
         ]
     )
-
-
-def _dependencyTokens(text: str) -> set[str]:
-    return {token for token in _queryTokens(text) if token in DEPENDENCY_TOKENS}
 
 
 def _queryTokens(text: str) -> list[str]:

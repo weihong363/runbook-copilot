@@ -37,8 +37,6 @@
 
 状态：已完成第一轮实现
 
-TODO：
-
 - [x] 明确 chunk metadata 结构，补齐并统一字段命名
 - [x] 增加 `doc_type`、`tags`、`service` 等可用于检索和过滤的 metadata
 - [x] 优化 markdown 解析规则，处理标题前导说明、空 section、短 section
@@ -66,23 +64,23 @@ TODO：
 
 目标：让 analyze 入口不只是拼接原始文本，而是真正理解 incident 输入。
 
-TODO：
+状态：已完成第一轮实现
 
-- [ ] 扩展 entity extraction，至少支持：
+- [x] 扩展 entity extraction，至少支持：
   - `service`
   - `dependency`
   - `exception_type`
   - `error_code`
   - `keywords`
   - `symptom_tags`
-- [ ] 明确 query rewrite 输出结构，建议拆分为：
+- [x] 明确 query rewrite 输出结构，建议拆分为：
   - `keyword_query`
   - `semantic_query`
   - `filters`
-- [ ] 在检索阶段实际使用 rewrite 结果，而不是只保留一个字符串
-- [ ] 增加服务名、依赖名、错误码的 filter 或 boost 逻辑
-- [ ] 对空字符串、异常短日志、噪声日志增加更明确的输入校验和错误提示
-- [ ] 为 entity extraction 和 query rewrite 增加单元测试
+- [x] 在检索阶段实际使用 rewrite 结果，而不是只保留一个字符串
+- [x] 增加服务名、依赖名、错误码的 filter 或 boost 逻辑
+- [x] 对空字符串、异常短日志、噪声日志增加更明确的输入校验和错误提示
+- [x] 为 entity extraction 和 query rewrite 增加单元测试
 
 验收标准：
 

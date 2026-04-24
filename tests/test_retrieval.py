@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from app.models.schemas import QueryRewrite, RetrievalFilters
 from app.rag.ingestion import ingestKnowledge
 from app.rag.retriever import HybridRetriever
 from app.rag.vector_store import SQLiteVectorStore
@@ -78,3 +79,30 @@ def testHybridRetrieverPrefersRunbookOverIncidentNoise(tmp_path: Path) -> None:
     results = HybridRetriever(store, 64).search("payment-service remaining connection slots are reserved", 3)
 
     assert results[0]["doc_type"] == "runbook"
+
+
+def testHybridRetrieverUsesStructuredFilters(tmp_path: Path) -> None:
+    knowledgeDir = tmp_path / "knowledge"
+    knowledgeDir.mkdir()
+    (knowledgeDir / "runbook-order-service.md").write_text(
+        "# order-service Runbook\nTags: order-service, redis\n\n## Redis 连接失败\n出现 connection refused 时检查 redis。",
+        encoding="utf-8",
+    )
+    (knowledgeDir / "runbook-payment-service.md").write_text(
+        "# payment-service Runbook\nTags: payment-service, redis\n\n## Redis 连接失败\n出现 connection refused 时检查 redis。",
+        encoding="utf-8",
+    )
+    store = SQLiteVectorStore(tmp_path / "db.sqlite3")
+    ingestKnowledge(knowledgeDir, store, 64)
+
+    results = HybridRetriever(store, 64).search(
+        QueryRewrite(
+            keywordQuery="redis connection refused",
+            semanticQuery="order-service redis connection refused after release",
+            filters=RetrievalFilters(service="order-service", docTypes=["runbook"], dependencies=["redis"]),
+        ),
+        3,
+    )
+
+    assert results
+    assert results[0]["service"] == "order-service"
