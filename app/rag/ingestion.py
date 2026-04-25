@@ -1,9 +1,9 @@
 from pathlib import Path
 from typing import TypedDict
 
+from app.rag.embedding_provider import EmbeddingProvider, HashEmbeddingProvider
 from app.rag.chunking import MarkdownChunk, chunkMarkdown
-from app.rag.embedding import embedText
-from app.rag.vector_store import SQLiteVectorStore
+from app.rag.vector_store import VectorStore
 
 
 class IngestStats(TypedDict):
@@ -14,9 +14,15 @@ class IngestStats(TypedDict):
     indexedFiles: list[str]
 
 
-def ingestKnowledge(knowledgeDir: Path, vectorStore: SQLiteVectorStore, dimension: int) -> IngestStats:
+def ingestKnowledge(
+    knowledgeDir: Path,
+    vectorStore: VectorStore,
+    dimension: int,
+    embeddingProvider: EmbeddingProvider | None = None,
+) -> IngestStats:
     if not knowledgeDir.exists():
         raise FileNotFoundError(f"知识目录不存在: {knowledgeDir}")
+    provider = embeddingProvider or HashEmbeddingProvider(dimension)
     markdownPaths = sorted(knowledgeDir.rglob("*.md"))
     chunks: list[MarkdownChunk] = []
     docTypeCounts: dict[str, int] = {}
@@ -28,12 +34,11 @@ def ingestKnowledge(knowledgeDir: Path, vectorStore: SQLiteVectorStore, dimensio
             docType = documentChunks[0].metadata.docType
             docTypeCounts[docType] = docTypeCounts.get(docType, 0) + 1
     embeddings = {
-        chunk.id: embedText(
+        chunk.id: provider.embed(
             (
                 f"{chunk.metadata.title}\n{chunk.metadata.docType}\n{chunk.metadata.service}\n"
                 f"{chunk.heading}\n{' '.join(chunk.metadata.tags)}\n{chunk.content}"
-            ),
-            dimension,
+            )
         )
         for chunk in chunks
     }

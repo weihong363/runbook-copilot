@@ -1,12 +1,14 @@
 from app.core.config import getSettings
+from app.rag.embedding_provider import createEmbeddingProvider
+from app.rag.factory import createVectorStore
 from app.rag.ingestion import ingestKnowledge
-from app.rag.vector_store import SQLiteVectorStore
 
 
 def main() -> None:
     settings = getSettings()
-    store = SQLiteVectorStore(settings.databasePath)
-    stats = ingestKnowledge(settings.knowledgeDir, store, settings.vectorDimension)
+    store = createVectorStore(settings)
+    embeddingProvider = createEmbeddingProvider(settings.embeddingProvider, settings.vectorDimension, settings.embeddingModel)
+    stats = ingestKnowledge(settings.knowledgeDir, store, settings.vectorDimension, embeddingProvider)
     print(
         "已导入文档 {documents} 份，chunk {chunks} 个，合并短小节 {merged} 个，按类型统计 {docTypes}".format(
             documents=stats["indexedDocuments"],

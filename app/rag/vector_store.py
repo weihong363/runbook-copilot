@@ -1,9 +1,21 @@
 import json
 from pathlib import Path
+from typing import Protocol
 
 from app.core.database import connect, initializeDatabase
 from app.rag.chunking import MarkdownChunk
 from app.rag.embedding import cosineSimilarity
+
+
+class VectorStore(Protocol):
+    def replaceChunks(self, chunks: list[MarkdownChunk], embeddings: dict[str, list[float]]) -> None:
+        raise NotImplementedError
+
+    def allChunks(self) -> list[dict]:
+        raise NotImplementedError
+
+    def search(self, queryEmbedding: list[float], topK: int) -> list[tuple[dict, float]]:
+        raise NotImplementedError
 
 
 class SQLiteVectorStore:

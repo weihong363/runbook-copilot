@@ -2,8 +2,7 @@ from fastapi import APIRouter, HTTPException
 
 from app.core.config import getSettings
 from app.models.schemas import IncidentAnalyzeRequest, IncidentAnalyzeResponse
-from app.rag.retriever import HybridRetriever
-from app.rag.vector_store import SQLiteVectorStore
+from app.rag.factory import createRetriever
 from app.services.incident_analyzer import IncidentAnalyzer
 
 router = APIRouter(prefix="/api/incidents", tags=["incidents"])
@@ -13,8 +12,7 @@ router = APIRouter(prefix="/api/incidents", tags=["incidents"])
 def analyzeIncident(request: IncidentAnalyzeRequest) -> IncidentAnalyzeResponse:
     settings = getSettings()
     try:
-        store = SQLiteVectorStore(settings.databasePath)
-        retriever = HybridRetriever(store, settings.vectorDimension)
+        retriever = createRetriever(settings)
         analyzer = IncidentAnalyzer(retriever, settings.topK)
         if request.debug:
             entities, rewrittenQuery, answer, debug = analyzer.analyzeWithDebug(request)

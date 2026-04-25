@@ -4,8 +4,9 @@ import re
 
 from app.models.schemas import QueryRewrite, RetrievalDebug, RetrievalDebugItem
 from app.rag.bm25 import BM25Index
-from app.rag.embedding import cosineSimilarity, embedText
-from app.rag.vector_store import SQLiteVectorStore
+from app.rag.embedding import cosineSimilarity
+from app.rag.embedding_provider import EmbeddingProvider, HashEmbeddingProvider
+from app.rag.vector_store import VectorStore
 
 DEPENDENCY_TOKENS = {
     "redis",
@@ -28,11 +29,12 @@ class SearchResult:
 
 
 class HybridRetriever:
-    def __init__(self, vectorStore: SQLiteVectorStore, dimension: int) -> None:
-        if dimension < 16:
-            raise ValueError("dimension 至少为 16")
+    def __init__(self, vectorStore: VectorStore, dimensionOrProvider: int | EmbeddingProvider) -> None:
         self.vectorStore = vectorStore
-        self.dimension = dimension
+        if isinstance(dimensionOrProvider, int):
+            self.embeddingProvider = HashEmbeddingProvider(dimensionOrProvider)
+        else:
+            self.embeddingProvider = dimensionOrProvider
 
     def search(self, query: str | QueryRewrite, topK: int) -> list[dict]:
         return self.searchWithDebug(query, topK).results
@@ -55,7 +57,7 @@ class HybridRetriever:
                     candidates=[],
                 ),
             )
-        vectorResults = _vectorSearch(chunks, queryBundle.semanticQuery, topK * 3, self.dimension)
+        vectorResults = _vectorSearch(chunks, queryBundle.semanticQuery, topK * 3, self.embeddingProvider)
         bm25Results = BM25Index(chunks).search(queryBundle.keywordQuery, topK * 2)
         return self._merge(vectorResults, bm25Results, queryBundle, topK, len(allChunks), len(chunks))
 
@@ -134,11 +136,11 @@ def _vectorSearch(
     chunks: list[dict],
     semanticQuery: str,
     topK: int,
-    dimension: int,
+    embeddingProvider: EmbeddingProvider,
 ) -> list[tuple[dict, float]]:
     if not semanticQuery.strip():
         return []
-    queryEmbedding = embedText(_normalizeText(semanticQuery), dimension)
+    queryEmbedding = embeddingProvider.embed(_normalizeText(semanticQuery))
     scored: list[tuple[dict, float]] = []
     for chunk in chunks:
         embedding = json.loads(chunk["embedding"])

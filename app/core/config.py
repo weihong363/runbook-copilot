@@ -12,6 +12,9 @@ class Settings(BaseModel):
     dataDir: Path = Field(default=Path("data"))
     databasePath: Path = Field(default=Path("data/runbook_copilot.sqlite3"))
     vectorDimension: int = Field(default=128, ge=16)
+    vectorStoreBackend: str = Field(default="sqlite")
+    embeddingProvider: str = Field(default="hash")
+    embeddingModel: str = Field(default="sentence-transformers/all-MiniLM-L6-v2")
     topK: int = Field(default=5, ge=1, le=20)
 
 
@@ -27,6 +30,9 @@ def getSettings() -> Settings:
         dataDir=_resolveProjectPath(os.getenv("DATA_DIR", "data")),
         databasePath=_resolveProjectPath(os.getenv("DATABASE_PATH", "data/runbook_copilot.sqlite3")),
         vectorDimension=int(os.getenv("VECTOR_DIMENSION", "128")),
+        vectorStoreBackend=os.getenv("VECTOR_STORE_BACKEND", "sqlite"),
+        embeddingProvider=os.getenv("EMBEDDING_PROVIDER", "hash"),
+        embeddingModel=os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2"),
         topK=int(os.getenv("TOP_K", "5")),
     )
 

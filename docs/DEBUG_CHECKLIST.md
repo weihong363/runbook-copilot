@@ -7,8 +7,8 @@
 执行：
 
 ```bash
-python scripts/lint_knowledge.py
-python scripts/ingest.py
+python ../scripts/lint_knowledge.py
+python ../scripts/ingest.py
 ```
 
 重点看：

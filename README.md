@@ -181,9 +181,36 @@ python scripts/lint_knowledge.py
 
 - [DEBUG_CHECKLIST.md](/Users/ironion/workspace/runbook-copilot/docs/DEBUG_CHECKLIST.md)
 
+## 向量与 Embedding
+
+默认配置继续使用本地 `sqlite + hash embedding`，保证离线可运行：
+
+```env
+VECTOR_STORE_BACKEND=sqlite
+EMBEDDING_PROVIDER=hash
+VECTOR_DIMENSION=128
+```
+
+如果要试验真实本地 embedding，可安装可选依赖：
+
+```bash
+pip install -r requirements-embeddings.txt
+EMBEDDING_PROVIDER=sentence-transformers python -m app.evaluation.evaluate
+```
+
+比较不同 provider 的评测结果：
+
+```bash
+python scripts/compare_vector_configs.py
+```
+
+当前决策记录见：
+
+- [VECTOR_BACKEND_DECISION.md](/Users/ironion/workspace/runbook-copilot/docs/VECTOR_BACKEND_DECISION.md)
+
 ## 后续路线
 
-- 接入真实 embedding 模型和 Chroma/FAISS。
+- 在评测证明有收益后，再接入 Chroma/FAISS。
 - 接入 LLM 生成器，并强制答案只引用检索结果。
 - 扩展 Markdown frontmatter 元数据解析。
 - 增加历史事故数据集和 recall/precision 评测指标。

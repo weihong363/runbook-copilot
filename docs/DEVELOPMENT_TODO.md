@@ -199,12 +199,19 @@
 
 ### Milestone 7：替换或升级向量能力
 
-TODO：
+状态：已完成第一轮实现
 
-- [ ] 评估是否从当前本地实现切换到 Chroma 或 FAISS
-- [ ] 接入真实 embedding 模型
-- [ ] 比较替换前后的 retrieval 指标变化
-- [ ] 保持存量接口不破坏现有 API
+- [x] 评估是否从当前本地实现切换到 Chroma 或 FAISS
+- [x] 接入真实 embedding 模型
+- [x] 比较替换前后的 retrieval 指标变化
+- [x] 保持存量接口不破坏现有 API
+
+当前结论：
+
+- 默认继续使用 `sqlite + hash embedding`
+- 已接入可选 `sentence-transformers` provider
+- 已提供 `scripts/compare_vector_configs.py` 对比入口
+- Chroma / FAISS 暂不作为默认后端，等评测集证明有收益后再切换
 
 适合启动的前提：
 

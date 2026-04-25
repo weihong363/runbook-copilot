@@ -4,9 +4,10 @@ from typing import Any, TypedDict
 
 from app.core.config import getSettings
 from app.models.schemas import IncidentAnalyzeRequest, TroubleshootingResponse
+from app.rag.embedding_provider import createEmbeddingProvider
+from app.rag.factory import createVectorStore
 from app.rag.ingestion import ingestKnowledge
 from app.rag.retriever import HybridRetriever
-from app.rag.vector_store import SQLiteVectorStore
 from app.services.incident_analyzer import IncidentAnalyzer
 
 
@@ -42,9 +43,10 @@ def evaluate(datasetPath: Path) -> EvaluationReport:
     if not datasetPath.exists():
         raise FileNotFoundError(f"评测集不存在: {datasetPath}")
     settings = getSettings()
-    store = SQLiteVectorStore(settings.databasePath)
-    ingestKnowledge(settings.knowledgeDir, store, settings.vectorDimension)
-    analyzer = IncidentAnalyzer(HybridRetriever(store, settings.vectorDimension), settings.topK)
+    store = createVectorStore(settings)
+    embeddingProvider = createEmbeddingProvider(settings.embeddingProvider, settings.vectorDimension, settings.embeddingModel)
+    ingestKnowledge(settings.knowledgeDir, store, settings.vectorDimension, embeddingProvider)
+    analyzer = IncidentAnalyzer(HybridRetriever(store, embeddingProvider), settings.topK)
     cases = [_evaluateCase(json.loads(line), analyzer) for line in _datasetLines(datasetPath)]
     return {
         "summary": _buildSummary(datasetPath, cases),
