@@ -1,7 +1,8 @@
 import pytest
 
 from app.core.config import Settings
-from app.rag.factory import createRetriever, createVectorStore
+from app.llm.answer_generator import TemplateAnswerGenerator
+from app.rag.factory import createAnswerGeneratorFromSettings, createRetriever, createVectorStore
 from app.rag.vector_store import SQLiteVectorStore
 
 
@@ -26,3 +27,12 @@ def testCreateRetrieverKeepsDefaultHashProvider(tmp_path) -> None:
     retriever = createRetriever(settings)
 
     assert retriever.embeddingProvider.name == "hash"
+
+
+def testCreateAnswerGeneratorUsesConfiguredPromptVersion(tmp_path) -> None:
+    settings = Settings(databasePath=tmp_path / "store.sqlite3", answerPromptVersion="grounded-v1")
+
+    generator = createAnswerGeneratorFromSettings(settings)
+
+    assert isinstance(generator, TemplateAnswerGenerator)
+    assert generator.promptVersion == "grounded-v1"

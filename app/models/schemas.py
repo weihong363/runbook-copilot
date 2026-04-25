@@ -97,10 +97,18 @@ class RetrievalDebug(BaseModel):
     candidates: list[RetrievalDebugItem] = Field(default_factory=list)
 
 
+class AnswerGenerationDebug(BaseModel):
+    provider: str
+    promptVersion: str
+    usedLlm: bool
+    warnings: list[str] = Field(default_factory=list)
+
+
 class IncidentAnalyzeDebug(BaseModel):
     entities: ExtractedEntities
     rewrittenQuery: QueryRewrite
     retrieval: RetrievalDebug
+    answerGeneration: AnswerGenerationDebug | None = None
 
 
 class IncidentAnalyzeResponse(BaseModel):

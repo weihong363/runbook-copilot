@@ -246,17 +246,26 @@
 
 ### Milestone 9：更强的回答生成
 
-TODO：
+状态：已完成首版。
 
-- [ ] 接入真实 LLM 做 answer synthesis
-- [ ] 约束 prompt，确保答案受 citation 绑定
-- [ ] 增加 prompt versioning
-- [ ] 对比模板式回答与 LLM 回答的 usefulness
+已完成：
 
-适合启动的前提：
+- [x] 接入可选 OpenAI answer generator 做 answer synthesis
+- [x] 约束 prompt，确保答案受 citation 绑定
+- [x] 增加 prompt versioning
+- [x] 对比模板式回答与 LLM 回答的 usefulness
 
-- citation 和 retrieval 质量已足够稳定
-- 能明确验证生成层带来的收益，而不是掩盖检索问题
+当前结论：
+
+- 默认继续使用 template，保证离线可运行
+- OpenAI 路径通过 `ANSWER_GENERATOR=openai` 启用
+- debug 输出包含 answer generator、prompt version 和 usedLlm
+- 离线评测新增 `answerUsefulness`
+- `scripts/compare_answer_generators.py` 可比较 template/openai，缺少依赖或 API key 时会跳过 openai
+
+决策记录：
+
+- [ANSWER_GENERATION_DECISION.md](/Users/ironion/workspace/runbook-copilot/docs/ANSWER_GENERATION_DECISION.md)
 
 ---
 

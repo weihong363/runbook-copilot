@@ -18,6 +18,9 @@ dev = [
 embeddings = [
   "sentence-transformers>=2.7.0",
 ]
+llm = [
+  "openai>=1.100.0",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

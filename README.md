@@ -9,6 +9,7 @@
 - 使用本地哈希向量 + SQLite 做最小向量检索。
 - 使用 BM25 做关键词检索。
 - 合并向量和 BM25 结果，并基于服务名、错误码、依赖名和 section 标题做简单 rerank。
+- 默认使用模板生成 grounded answer，可选接入 OpenAI 做受 citation 约束的回答合成。
 - 提供反馈接口和离线 JSONL 评测脚本。
 
 ## 架构
@@ -18,6 +19,7 @@ FastAPI routes
   -> services/incident_analyzer.py
   -> rag/retriever.py
   -> rag/vector_store.py + rag/bm25.py
+  -> llm/answer_generator.py
   -> SQLite
 ```
 
@@ -26,13 +28,15 @@ FastAPI routes
 - `app/api/routes`：HTTP API。
 - `app/models`：Pydantic 请求和响应模型。
 - `app/rag`：Markdown 分块、嵌入、向量存储、BM25 和混合检索。
+- `app/llm`：模板回答、可选 LLM 回答生成、prompt version 和 citation 绑定。
 - `app/services`：事故分析和反馈写入。
 - `app/evaluation`：离线评测脚本和样例数据。
 - `knowledge/`：本地知识库 Markdown。
 
 ## 本轮 MVP 决策
 
-- 暂不接真实 LLM，先用可解释模板生成 grounded answer，确保引用来自检索结果。
+- 默认用可解释模板生成 grounded answer，确保离线可运行。
+- 可选接入 OpenAI Responses API 做 answer synthesis，但仍强制答案 citation 来自检索结果。
 - 向量检索使用确定性的哈希嵌入并存入 SQLite，避免首轮引入 Chroma/FAISS 的安装复杂度。后续可以替换为 Chroma、FAISS 或真实 embedding 模型。
 - 不加入 Docker、认证、后台任务和外部告警系统集成。
 
@@ -102,6 +106,7 @@ curl -X POST http://127.0.0.1:8000/api/knowledge/ingest
 - 只在召回证据足够强时给出明确排障起点
 - 当只命中弱相关资料时，会明确标注“只是初步线索”
 - citation excerpt 会去掉 markdown 标题行，保留更稳定的正文片段
+- LLM 生成路径会二次校验 citations，只保留本次检索返回的 chunk
 
 ### `POST /api/feedback`
 
@@ -120,6 +125,7 @@ python -m app.evaluation.evaluate
 - `summary.hitAt5`：期望文档是否进入前 5 个 citation
 - `summary.citationRelevance`：首个 citation 是否就是期望文档
 - `summary.schemaValidity`：回答是否通过 response schema 校验
+- `summary.answerUsefulness`：答案是否同时满足结构完整、citation 相关和可执行步骤数量
 - `summary.keywordCoverage`：期望关键词在 `rewrittenKeywordQuery` 中的覆盖比例
 
 每个 case 还会输出：
@@ -135,6 +141,7 @@ python -m app.evaluation.evaluate
 - `hitAt5` 正常但 `citationRelevance` 下降，通常说明召回还在，但排序变差
 - `keywordCoverage` 下降，通常说明 incident 输入理解或 query rewrite 退化
 - `schemaValidity` 不为 `1.0`，说明回答层或 response schema 出现回归
+- `answerUsefulness` 下降，通常优先检查生成层是否丢失步骤、nextAction 或有效引用
 
 ## 知识库规范
 
@@ -210,10 +217,38 @@ python scripts/compare_vector_configs.py
 
 - [VECTOR_BACKEND_DECISION.md](/Users/ironion/workspace/runbook-copilot/docs/VECTOR_BACKEND_DECISION.md)
 
+## 回答生成
+
+默认配置使用模板生成，保证本地无外部依赖即可运行：
+
+```env
+ANSWER_GENERATOR=template
+ANSWER_PROMPT_VERSION=grounded-v1
+```
+
+如果要试验真实 LLM 回答合成，可安装可选依赖并配置 OpenAI API key：
+
+```bash
+pip install -r requirements-llm.txt
+ANSWER_GENERATOR=openai OPENAI_MODEL=gpt-5.2 python -m app.evaluation.evaluate
+```
+
+比较模板生成和 LLM 生成的评测结果：
+
+```bash
+python scripts/compare_answer_generators.py
+```
+
+如果未安装 `openai` 或缺少 API key，脚本会把 `openai` 标记为 `skipped`，不会影响默认模板路径。
+
+当前决策记录见：
+
+- [ANSWER_GENERATION_DECISION.md](/Users/ironion/workspace/runbook-copilot/docs/ANSWER_GENERATION_DECISION.md)
+
 ## 后续路线
 
 - 在评测证明有收益后，再接入 Chroma/FAISS。
-- 接入 LLM 生成器，并强制答案只引用检索结果。
+- 扩展 LLM 生成评测集，并在 usefulness 明确提升后再切默认生成器。
 - 扩展 Markdown frontmatter 元数据解析。
 - 增加历史事故数据集和 recall/precision 评测指标。
 - 增加更细粒度的服务过滤、文档类型过滤和可解释 rerank reason。

@@ -35,6 +35,8 @@ def testAnalyzeDebugFlagReturnsRetrievalDebug(monkeypatch, tmp_path) -> None:
     assert payload["debug"] is not None
     assert payload["debug"]["retrieval"]["candidates"]
     assert payload["debug"]["retrieval"]["candidates"][0]["rerankReasons"]
+    assert payload["debug"]["answerGeneration"]["provider"] == "template"
+    assert payload["debug"]["answerGeneration"]["usedLlm"] is False
     getSettings.cache_clear()
 
 

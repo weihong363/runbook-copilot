@@ -5,7 +5,7 @@ from typing import Any, TypedDict
 from app.core.config import getSettings
 from app.models.schemas import IncidentAnalyzeRequest, TroubleshootingResponse
 from app.rag.embedding_provider import createEmbeddingProvider
-from app.rag.factory import createVectorStore
+from app.rag.factory import createAnswerGeneratorFromSettings, createVectorStore
 from app.rag.ingestion import ingestKnowledge
 from app.rag.retriever import HybridRetriever
 from app.services.incident_analyzer import IncidentAnalyzer
@@ -17,6 +17,7 @@ class EvaluationCase(TypedDict):
     hitAt5: bool
     citationRelevant: bool
     schemaValid: bool
+    answerUseful: bool
     keywordCoverage: float
     expectedCitationPath: str
     actualCitationPaths: list[str]
@@ -31,6 +32,7 @@ class EvaluationSummary(TypedDict):
     hitAt5: float
     citationRelevance: float
     schemaValidity: float
+    answerUsefulness: float
     keywordCoverage: float
 
 
@@ -46,7 +48,8 @@ def evaluate(datasetPath: Path) -> EvaluationReport:
     store = createVectorStore(settings)
     embeddingProvider = createEmbeddingProvider(settings.embeddingProvider, settings.vectorDimension, settings.embeddingModel)
     ingestKnowledge(settings.knowledgeDir, store, settings.vectorDimension, embeddingProvider)
-    analyzer = IncidentAnalyzer(HybridRetriever(store, embeddingProvider), settings.topK)
+    answerGenerator = createAnswerGeneratorFromSettings(settings)
+    analyzer = IncidentAnalyzer(HybridRetriever(store, embeddingProvider), settings.topK, answerGenerator)
     cases = [_evaluateCase(json.loads(line), analyzer) for line in _datasetLines(datasetPath)]
     return {
         "summary": _buildSummary(datasetPath, cases),
@@ -60,14 +63,16 @@ def _evaluateCase(item: dict[str, Any], analyzer: IncidentAnalyzer) -> Evaluatio
     TroubleshootingResponse.model_validate(answer.model_dump())
     expectedPath = item["expectedCitationPath"]
     actualPaths = [citation.path for citation in answer.citations]
+    citationRelevant = _pathHit(expectedPath, actualPaths[:1])
     expectedKeywords = [keyword.lower() for keyword in item.get("expectedKeywords", [])]
     keywordQuery = rewrittenQuery.keywordQuery.lower()
     return {
         "name": item.get("name", "case"),
         "hitAt3": _pathHit(expectedPath, actualPaths[:3]),
         "hitAt5": _pathHit(expectedPath, actualPaths[:5]),
-        "citationRelevant": _pathHit(expectedPath, actualPaths[:1]),
+        "citationRelevant": citationRelevant,
         "schemaValid": True,
+        "answerUseful": _answerUseful(answer, citationRelevant),
         "keywordCoverage": _keywordCoverage(expectedKeywords, keywordQuery),
         "expectedCitationPath": expectedPath,
         "actualCitationPaths": actualPaths,
@@ -85,6 +90,7 @@ def _buildSummary(datasetPath: Path, cases: list[EvaluationCase]) -> EvaluationS
         "hitAt5": round(sum(1 for case in cases if case["hitAt5"]) / total, 4),
         "citationRelevance": round(sum(1 for case in cases if case["citationRelevant"]) / total, 4),
         "schemaValidity": round(sum(1 for case in cases if case["schemaValid"]) / total, 4),
+        "answerUsefulness": round(sum(1 for case in cases if case["answerUseful"]) / total, 4),
         "keywordCoverage": round(sum(case["keywordCoverage"] for case in cases) / total, 4),
     }
 
@@ -102,6 +108,10 @@ def _keywordCoverage(expectedKeywords: list[str], keywordQuery: str) -> float:
         return 1.0
     hits = sum(1 for keyword in expectedKeywords if keyword in keywordQuery)
     return round(hits / len(expectedKeywords), 4)
+
+
+def _answerUseful(answer: TroubleshootingResponse, citationRelevant: bool) -> bool:
+    return bool(answer.summary.strip()) and citationRelevant and len(answer.steps) >= 3 and bool(answer.nextAction.strip())
 
 
 if __name__ == "__main__":

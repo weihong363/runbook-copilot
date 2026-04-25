@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException
 
 from app.core.config import getSettings
 from app.models.schemas import IncidentAnalyzeRequest, IncidentAnalyzeResponse
-from app.rag.factory import createRetriever
+from app.rag.factory import createAnswerGeneratorFromSettings, createRetriever
 from app.services.incident_analyzer import IncidentAnalyzer
 
 router = APIRouter(prefix="/api/incidents", tags=["incidents"])
@@ -13,7 +13,8 @@ def analyzeIncident(request: IncidentAnalyzeRequest) -> IncidentAnalyzeResponse:
     settings = getSettings()
     try:
         retriever = createRetriever(settings)
-        analyzer = IncidentAnalyzer(retriever, settings.topK)
+        answerGenerator = createAnswerGeneratorFromSettings(settings)
+        analyzer = IncidentAnalyzer(retriever, settings.topK, answerGenerator)
         if request.debug:
             entities, rewrittenQuery, answer, debug = analyzer.analyzeWithDebug(request)
             return IncidentAnalyzeResponse(

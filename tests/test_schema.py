@@ -1,7 +1,8 @@
 import pytest
 
 from app.models.schemas import Citation, IncidentAnalyzeRequest, TroubleshootingResponse
-from app.services.incident_analyzer import buildGroundedAnswer, extractEntities, rewriteQuery, validateIncidentInput
+from app.llm.grounded_answer import buildGroundedAnswer
+from app.services.incident_analyzer import extractEntities, rewriteQuery, validateIncidentInput
 
 
 def testTroubleshootingResponseSchemaIsValid() -> None:

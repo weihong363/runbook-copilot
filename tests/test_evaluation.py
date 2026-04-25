@@ -68,6 +68,8 @@ def testEvaluateReturnsStructuredMetrics(tmp_path, monkeypatch) -> None:
     assert report["summary"]["citationRelevance"] == 1.0
     assert report["summary"]["schemaValidity"] == 1.0
     assert report["summary"]["keywordCoverage"] >= 0.8
+    assert report["summary"]["answerUsefulness"] == 1.0
     assert len(report["cases"]) == 2
     assert report["cases"][0]["actualCitationPaths"]
+    assert report["cases"][0]["answerUseful"] is True
     getSettings.cache_clear()
