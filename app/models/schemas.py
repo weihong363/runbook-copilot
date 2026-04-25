@@ -93,6 +93,7 @@ class RetrievalDebug(BaseModel):
     totalChunks: int
     filteredChunks: int
     appliedFilters: RetrievalFilters
+    stages: list[str] = Field(default_factory=list)
     candidates: list[RetrievalDebugItem] = Field(default_factory=list)
 
 

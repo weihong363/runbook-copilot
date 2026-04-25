@@ -175,11 +175,13 @@ python scripts/lint_knowledge.py
 - `debug.entities`
 - `debug.rewrittenQuery`
 - `debug.retrieval.candidates`
+- `debug.retrieval.stages`
 - 每个候选文档的 `vectorScore`、`bm25Score`、`rerankBoost`、`finalScore` 和 `rerankReasons`
 
 排查步骤见：
 
 - [DEBUG_CHECKLIST.md](/Users/ironion/workspace/runbook-copilot/docs/DEBUG_CHECKLIST.md)
+- [RERANKER_DECISION.md](/Users/ironion/workspace/runbook-copilot/docs/RERANKER_DECISION.md)
 
 ## 向量与 Embedding
 

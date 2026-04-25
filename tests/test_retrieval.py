@@ -134,6 +134,36 @@ def testHybridRetrieverDebugIncludesScoreBreakdownAndReasons(tmp_path: Path) -> 
 
     assert searchResult.results
     assert searchResult.debug.totalChunks >= searchResult.debug.filteredChunks
+    assert any(stage.startswith("service_exact:checkout-api") for stage in searchResult.debug.stages)
+    assert any(stage.startswith("doc_type:runbook") for stage in searchResult.debug.stages)
     assert searchResult.debug.candidates
     assert searchResult.debug.candidates[0].finalScore > 0
     assert any("error_code_match" in reason for reason in searchResult.debug.candidates[0].rerankReasons)
+
+
+def testHybridRetrieverDebugIncludesFineGrainedRerankReasons(tmp_path: Path) -> None:
+    knowledgeDir = tmp_path / "knowledge"
+    knowledgeDir.mkdir()
+    (knowledgeDir / "runbook-order-service-redis.md").write_text(
+        "# order-service Redis Runbook\n"
+        "Tags: order-service, redis, connection\n\n"
+        "## Redis connection refused\n"
+        "出现 redis connection refused 时检查缓存实例状态。\n",
+        encoding="utf-8",
+    )
+    store = SQLiteVectorStore(tmp_path / "db.sqlite3")
+    ingestKnowledge(knowledgeDir, store, 64)
+
+    searchResult = HybridRetriever(store, 64).searchWithDebug(
+        QueryRewrite(
+            keywordQuery="order-service redis connection refused",
+            semanticQuery="order-service redis connection refused",
+            filters=RetrievalFilters(service="order-service", docTypes=["runbook"], dependencies=["redis"]),
+        ),
+        3,
+    )
+
+    reasons = searchResult.debug.candidates[0].rerankReasons
+    assert any(reason.startswith("tag_match") for reason in reasons)
+    assert any(reason.startswith("requested_doc_type:runbook") for reason in reasons)
+    assert any(reason.startswith("phrase_match") for reason in reasons)

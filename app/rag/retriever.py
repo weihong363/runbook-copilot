@@ -28,6 +28,12 @@ class SearchResult:
     debug: RetrievalDebug
 
 
+@dataclass(frozen=True)
+class FilterResult:
+    chunks: list[dict]
+    stages: list[str]
+
+
 class HybridRetriever:
     def __init__(self, vectorStore: VectorStore, dimensionOrProvider: int | EmbeddingProvider) -> None:
         self.vectorStore = vectorStore
@@ -46,7 +52,8 @@ class HybridRetriever:
         if not queryBundle.keywordQuery.strip() and not queryBundle.semanticQuery.strip():
             raise ValueError("query 不能为空")
         allChunks = self.vectorStore.allChunks()
-        chunks = _applyFilters(allChunks, queryBundle)
+        filterResult = _applyStageFilters(allChunks, queryBundle)
+        chunks = filterResult.chunks
         if not chunks:
             return SearchResult(
                 results=[],
@@ -54,12 +61,21 @@ class HybridRetriever:
                     totalChunks=len(allChunks),
                     filteredChunks=0,
                     appliedFilters=queryBundle.filters,
+                    stages=filterResult.stages,
                     candidates=[],
                 ),
             )
-        vectorResults = _vectorSearch(chunks, queryBundle.semanticQuery, topK * 3, self.embeddingProvider)
-        bm25Results = BM25Index(chunks).search(queryBundle.keywordQuery, topK * 2)
-        return self._merge(vectorResults, bm25Results, queryBundle, topK, len(allChunks), len(chunks))
+        vectorResults = _vectorSearch(chunks, queryBundle.semanticQuery, topK * 4, self.embeddingProvider)
+        bm25Results = BM25Index(chunks).search(queryBundle.keywordQuery, topK * 4)
+        return self._merge(
+            vectorResults,
+            bm25Results,
+            queryBundle,
+            topK,
+            len(allChunks),
+            len(chunks),
+            filterResult.stages,
+        )
 
     def _merge(
         self,
@@ -69,6 +85,7 @@ class HybridRetriever:
         topK: int,
         totalChunks: int,
         filteredChunks: int,
+        stages: list[str],
     ) -> SearchResult:
         scores: dict[str, dict] = {}
         normalizedQuery = _normalizeText(f"{queryBundle.keywordQuery} {queryBundle.semanticQuery}")
@@ -105,6 +122,7 @@ class HybridRetriever:
                 totalChunks=totalChunks,
                 filteredChunks=filteredChunks,
                 appliedFilters=queryBundle.filters,
+                stages=stages,
                 candidates=debugItems,
             ),
         )
@@ -118,18 +136,29 @@ def _ensureQueryRewrite(query: str | QueryRewrite) -> QueryRewrite:
 
 
 def _applyFilters(chunks: list[dict], queryBundle: QueryRewrite) -> list[dict]:
+    return _applyStageFilters(chunks, queryBundle).chunks
+
+
+def _applyStageFilters(chunks: list[dict], queryBundle: QueryRewrite) -> FilterResult:
     filtered = chunks
+    stages = [f"start:{len(chunks)}"]
     service = _normalizeText(queryBundle.filters.service or "")
     if service:
         matching = [chunk for chunk in filtered if _normalizeText(str(chunk.get("service", ""))) == service]
         if matching:
             filtered = matching
+            stages.append(f"service_exact:{service}:{len(filtered)}")
+        else:
+            stages.append(f"service_exact:{service}:fallback")
     docTypes = {_normalizeText(docType) for docType in queryBundle.filters.docTypes}
     if docTypes:
         matching = [chunk for chunk in filtered if _normalizeText(str(chunk.get("doc_type", ""))) in docTypes]
         if matching:
             filtered = matching
-    return filtered
+            stages.append(f"doc_type:{','.join(sorted(docTypes))}:{len(filtered)}")
+        else:
+            stages.append(f"doc_type:{','.join(sorted(docTypes))}:fallback")
+    return FilterResult(chunks=filtered, stages=stages)
 
 
 def _vectorSearch(
@@ -159,36 +188,72 @@ def _rerankBreakdown(chunk: dict, normalizedQuery: str, queryBundle: QueryRewrit
     reasons: list[str] = []
     queryTokens = set(_queryTokens(normalizedQuery))
     chunkTokens = set(_queryTokens(_chunkSearchText(chunk)))
+    chunkText = _normalizeText(_chunkSearchText(chunk))
     service = _normalizeText(str(chunk.get("service", "")))
     heading = _normalizeText(str(chunk.get("heading", "")))
     docType = _normalizeText(str(chunk.get("doc_type", "")))
     headingLevel = int(chunk.get("heading_level", 0) or 0)
     if service and service in normalizedQuery:
-        boost += 0.22
-        reasons.append("service_match:+0.22")
+        boost += 0.25
+        reasons.append("service_match:+0.25")
     if heading and any(token in heading for token in queryTokens):
         boost += 0.08
         reasons.append("heading_token_match:+0.08")
+    if heading and heading in normalizedQuery:
+        boost += 0.05
+        reasons.append("heading_phrase_match:+0.05")
     matchedCodes = sum(1 for code in queryBundle.filters.errorCodes if code.lower() in chunkTokens)
-    codeBoost = min(0.24, matchedCodes * 0.12)
+    codeBoost = min(0.28, matchedCodes * 0.14)
     if codeBoost:
         boost += codeBoost
         reasons.append(f"error_code_match:+{codeBoost:.2f}")
     matchedDependencies = sum(1 for dependency in queryBundle.filters.dependencies if dependency in chunkTokens)
-    dependencyBoost = min(0.18, matchedDependencies * 0.09)
+    dependencyBoost = min(0.2, matchedDependencies * 0.10)
     if dependencyBoost:
         boost += dependencyBoost
         reasons.append(f"dependency_match:+{dependencyBoost:.2f}")
+    tagMatches = _tagMatches(chunk, queryTokens)
+    tagBoost = min(0.12, len(tagMatches) * 0.04)
+    if tagBoost:
+        boost += tagBoost
+        reasons.append(f"tag_match:{','.join(tagMatches)}:+{tagBoost:.2f}")
+    phraseMatches = _phraseMatches(normalizedQuery, chunkText)
+    phraseBoost = min(0.1, len(phraseMatches) * 0.05)
+    if phraseBoost:
+        boost += phraseBoost
+        reasons.append(f"phrase_match:+{phraseBoost:.2f}")
+    requestedDocTypes = {_normalizeText(docType) for docType in queryBundle.filters.docTypes}
+    if requestedDocTypes and docType in requestedDocTypes:
+        boost += 0.06
+        reasons.append(f"requested_doc_type:{docType}:+0.06")
     if docType == "runbook":
-        boost += 0.04
-        reasons.append("runbook_doc:+0.04")
+        boost += 0.03
+        reasons.append("runbook_doc:+0.03")
     if headingLevel >= 2:
         boost += 0.06
         reasons.append("section_chunk:+0.06")
     if headingLevel == 1:
-        boost -= 0.08
-        reasons.append("title_chunk:-0.08")
+        boost -= 0.1
+        reasons.append("title_chunk:-0.10")
     return boost, reasons
+
+
+def _tagMatches(chunk: dict, queryTokens: set[str]) -> list[str]:
+    tags = _parseTags(chunk.get("tags", "[]"))
+    return sorted(tag for tag in tags if tag in queryTokens)
+
+
+def _phraseMatches(normalizedQuery: str, chunkText: str) -> list[str]:
+    tokens = _queryTokens(normalizedQuery)
+    phrases: list[str] = []
+    for size in [4, 3, 2]:
+        for index in range(0, max(0, len(tokens) - size + 1)):
+            phrase = " ".join(tokens[index : index + size])
+            if len(phrase) < 8 or phrase in phrases:
+                continue
+            if phrase in chunkText:
+                phrases.append(phrase)
+    return phrases[:3]
 
 
 def _toDebugItem(item: dict) -> RetrievalDebugItem:
@@ -210,14 +275,7 @@ def _toDebugItem(item: dict) -> RetrievalDebugItem:
 
 
 def _chunkSearchText(chunk: dict) -> str:
-    tags = chunk.get("tags", "[]")
-    if isinstance(tags, str):
-        try:
-            parsedTags = json.loads(tags)
-        except json.JSONDecodeError:
-            parsedTags = [tags]
-    else:
-        parsedTags = tags
+    parsedTags = _parseTags(chunk.get("tags", "[]"))
     return " ".join(
         [
             str(chunk.get("title", "")),
@@ -228,6 +286,17 @@ def _chunkSearchText(chunk: dict) -> str:
             str(chunk.get("content", "")),
         ]
     )
+
+
+def _parseTags(tags: object) -> list[str]:
+    if isinstance(tags, str):
+        try:
+            parsed = json.loads(tags)
+        except json.JSONDecodeError:
+            parsed = [tags]
+    else:
+        parsed = tags
+    return [_normalizeText(str(tag)) for tag in parsed]
 
 
 def _queryTokens(text: str) -> list[str]:

@@ -222,14 +222,20 @@
 
 ### Milestone 8：更强的 rerank 和多阶段检索
 
-TODO：
+状态：已完成第一轮实现
 
-- [ ] 引入更细粒度的规则 rerank
-- [ ] 评估是否需要轻量 reranker
-- [ ] 试验分阶段检索：
+- [x] 引入更细粒度的规则 rerank
+- [x] 评估是否需要轻量 reranker
+- [x] 试验分阶段检索：
   - 先按 service/doc_type 过滤
   - 再做 hybrid retrieval
   - 再做 rerank
+
+当前结论：
+
+- 默认继续使用规则 rerank
+- 暂不引入模型 reranker
+- debug 输出已包含 filter stages、score breakdown 和 rerank reasons
 
 适合启动的前提：
 

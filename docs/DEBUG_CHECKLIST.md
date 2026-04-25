@@ -70,9 +70,12 @@ metadata 错误通常会影响 service filter、doc type filter 和 rerank。
 
 - `debug.retrieval.totalChunks`
 - `debug.retrieval.filteredChunks`
+- `debug.retrieval.stages`
 - `debug.retrieval.candidates`
 
 如果 `filteredChunks` 远小于 `totalChunks`，先检查 service 或 doc type filter。
+
+如果 `stages` 里出现 `fallback`，说明某个 metadata filter 没有找到匹配文档，系统退回到了上一阶段候选集。
 
 如果 candidates 中没有期望文档，问题更可能在 metadata、filters 或知识库内容。
 
@@ -94,6 +97,8 @@ metadata 错误通常会影响 service filter、doc type filter 和 rerank。
 - `rerankBoost` 低：service、错误码、依赖或 section 标题没有命中
 - `rerankReasons` 缺少 `service_match`：检查 service metadata
 - `rerankReasons` 缺少 `error_code_match`：检查错误码是否进入 filters
+- `rerankReasons` 缺少 `tag_match`：检查文档 tags 是否包含服务名、依赖名或故障主题
+- `rerankReasons` 缺少 `phrase_match`：检查 query rewrite 是否保留了关键短语
 
 ## 7. 常见问题定位
 
