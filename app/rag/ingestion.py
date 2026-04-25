@@ -11,6 +11,7 @@ class IngestStats(TypedDict):
     indexedChunks: int
     indexedByDocType: dict[str, int]
     emptySectionsMerged: int
+    indexedFiles: list[str]
 
 
 def ingestKnowledge(knowledgeDir: Path, vectorStore: SQLiteVectorStore, dimension: int) -> IngestStats:
@@ -43,4 +44,5 @@ def ingestKnowledge(knowledgeDir: Path, vectorStore: SQLiteVectorStore, dimensio
         "indexedChunks": len(chunks),
         "indexedByDocType": docTypeCounts,
         "emptySectionsMerged": mergedSections,
+        "indexedFiles": [str(path) for path in markdownPaths],
     }

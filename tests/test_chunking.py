@@ -30,3 +30,13 @@ def testIngestKnowledgeReturnsDocTypeStats(tmp_path: Path) -> None:
     assert stats["indexedDocuments"] == 1
     assert stats["indexedChunks"] >= 1
     assert stats["indexedByDocType"] == {"runbook": 1}
+    assert stats["indexedFiles"] == [str(knowledgeDir / "runbook-payment-service.md")]
+
+
+def testFaqDocTypeIsNotMistakenForService() -> None:
+    chunks = chunkMarkdown(
+        "# auth-service FAQ\nTags: auth-service, faq, token\n\n## Token 过期\n检查 token 配置。",
+        Path("knowledge/faq-auth-service.md"),
+    )
+
+    assert chunks[0].metadata.docType == "faq"

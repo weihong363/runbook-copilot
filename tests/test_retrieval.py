@@ -106,3 +106,34 @@ def testHybridRetrieverUsesStructuredFilters(tmp_path: Path) -> None:
 
     assert results
     assert results[0]["service"] == "order-service"
+
+
+def testHybridRetrieverDebugIncludesScoreBreakdownAndReasons(tmp_path: Path) -> None:
+    knowledgeDir = tmp_path / "knowledge"
+    knowledgeDir.mkdir()
+    (knowledgeDir / "runbook-checkout-api.md").write_text(
+        "# checkout-api Runbook\nTags: checkout-api, postgres\n\n## 数据库超时\n出现 DB_POOL_EXHAUSTED 时检查连接池。",
+        encoding="utf-8",
+    )
+    store = SQLiteVectorStore(tmp_path / "db.sqlite3")
+    ingestKnowledge(knowledgeDir, store, 64)
+
+    searchResult = HybridRetriever(store, 64).searchWithDebug(
+        QueryRewrite(
+            keywordQuery="checkout-api DB_POOL_EXHAUSTED",
+            semanticQuery="checkout-api database pool exhausted",
+            filters=RetrievalFilters(
+                service="checkout-api",
+                docTypes=["runbook"],
+                dependencies=["postgres"],
+                errorCodes=["DB_POOL_EXHAUSTED"],
+            ),
+        ),
+        3,
+    )
+
+    assert searchResult.results
+    assert searchResult.debug.totalChunks >= searchResult.debug.filteredChunks
+    assert searchResult.debug.candidates
+    assert searchResult.debug.candidates[0].finalScore > 0
+    assert any("error_code_match" in reason for reason in searchResult.debug.candidates[0].rerankReasons)

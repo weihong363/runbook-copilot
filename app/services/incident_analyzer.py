@@ -3,6 +3,7 @@ import re
 from app.models.schemas import (
     Citation,
     ExtractedEntities,
+    IncidentAnalyzeDebug,
     IncidentAnalyzeRequest,
     QueryRewrite,
     RetrievalFilters,
@@ -43,6 +44,22 @@ class IncidentAnalyzer:
         results = self.retriever.search(rewrittenQuery, self.topK)
         answer = buildGroundedAnswer(request, rewrittenQuery, results)
         return entities, rewrittenQuery, answer
+
+    def analyzeWithDebug(
+        self,
+        request: IncidentAnalyzeRequest,
+    ) -> tuple[ExtractedEntities, QueryRewrite, TroubleshootingResponse, IncidentAnalyzeDebug]:
+        validateIncidentInput(request)
+        entities = extractEntities(request)
+        rewrittenQuery = rewriteQuery(request, entities)
+        searchResult = self.retriever.searchWithDebug(rewrittenQuery, self.topK)
+        answer = buildGroundedAnswer(request, rewrittenQuery, searchResult.results)
+        debug = IncidentAnalyzeDebug(
+            entities=entities,
+            rewrittenQuery=rewrittenQuery,
+            retrieval=searchResult.debug,
+        )
+        return entities, rewrittenQuery, answer, debug
 
 
 def validateIncidentInput(request: IncidentAnalyzeRequest) -> None:

@@ -170,16 +170,16 @@
 
 目标：让我们在排查“为什么没召回”“为什么排错顺序”时更省时间。
 
-TODO：
+状态：已完成第一轮实现
 
-- [ ] 为 ingest 增加更清晰的日志输出
-- [ ] 为 analyze 增加 debug 信息开关
-- [ ] 可选返回中间信息：
+- [x] 为 ingest 增加更清晰的日志输出
+- [x] 为 analyze 增加 debug 信息开关
+- [x] 可选返回中间信息：
   - entities
   - rewritten queries
   - retrieval scores
   - rerank reasons
-- [ ] 为失败案例整理一个 debug checklist
+- [x] 为失败案例整理一个 debug checklist
 
 验收标准：
 

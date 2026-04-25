@@ -106,7 +106,7 @@ def _mergeShortSections(sections: list[tuple[str, int, str]]) -> list[tuple[str,
 
 def _inferDocType(path: Path, markdown: str) -> str:
     lowered = f"{path.name}\n{markdown[:500]}".lower()
-    for docType in ["runbook", "incident", "service", "faq"]:
+    for docType in ["runbook", "incident", "faq", "service"]:
         if docType in lowered:
             return docType
     return "doc"

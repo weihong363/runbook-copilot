@@ -157,6 +157,30 @@ python scripts/lint_knowledge.py
 
 这个脚本会检查标题、tags、文档类型、二级标题和 service 提取情况。
 
+## 调试
+
+分析接口支持可选 debug 开关：
+
+```json
+{
+  "alertTitle": "checkout-api HTTP 500",
+  "serviceName": "checkout-api",
+  "logSnippet": "DB_POOL_EXHAUSTED timeout acquiring connection",
+  "debug": true
+}
+```
+
+开启后，响应会额外返回：
+
+- `debug.entities`
+- `debug.rewrittenQuery`
+- `debug.retrieval.candidates`
+- 每个候选文档的 `vectorScore`、`bm25Score`、`rerankBoost`、`finalScore` 和 `rerankReasons`
+
+排查步骤见：
+
+- [DEBUG_CHECKLIST.md](/Users/ironion/workspace/runbook-copilot/docs/DEBUG_CHECKLIST.md)
+
 ## 后续路线
 
 - 接入真实 embedding 模型和 Chroma/FAISS。

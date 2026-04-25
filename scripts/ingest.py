@@ -8,12 +8,15 @@ def main() -> None:
     store = SQLiteVectorStore(settings.databasePath)
     stats = ingestKnowledge(settings.knowledgeDir, store, settings.vectorDimension)
     print(
-        "已导入文档 {documents} 份，chunk {chunks} 个，按类型统计 {docTypes}".format(
+        "已导入文档 {documents} 份，chunk {chunks} 个，合并短小节 {merged} 个，按类型统计 {docTypes}".format(
             documents=stats["indexedDocuments"],
             chunks=stats["indexedChunks"],
+            merged=stats["emptySectionsMerged"],
             docTypes=stats["indexedByDocType"],
         )
     )
+    for path in stats["indexedFiles"]:
+        print(f"- {path}")
 
 
 if __name__ == "__main__":

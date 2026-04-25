@@ -15,6 +15,7 @@ class IncidentAnalyzeRequest(BaseModel):
     serviceName: str = Field(min_length=1, max_length=120)
     logSnippet: str = Field(min_length=1, max_length=4000)
     symptomDescription: str | None = Field(default=None, max_length=1000)
+    debug: bool = False
 
     @field_validator("alertTitle", "serviceName", "logSnippet", mode="before")
     @classmethod
@@ -73,10 +74,39 @@ class TroubleshootingResponse(BaseModel):
         return self
 
 
+class RetrievalDebugItem(BaseModel):
+    chunkId: str
+    title: str
+    path: str
+    heading: str
+    docType: str
+    service: str
+    vectorScore: float
+    bm25Score: float
+    bm25Normalized: float
+    rerankBoost: float
+    finalScore: float
+    rerankReasons: list[str] = Field(default_factory=list)
+
+
+class RetrievalDebug(BaseModel):
+    totalChunks: int
+    filteredChunks: int
+    appliedFilters: RetrievalFilters
+    candidates: list[RetrievalDebugItem] = Field(default_factory=list)
+
+
+class IncidentAnalyzeDebug(BaseModel):
+    entities: ExtractedEntities
+    rewrittenQuery: QueryRewrite
+    retrieval: RetrievalDebug
+
+
 class IncidentAnalyzeResponse(BaseModel):
     entities: ExtractedEntities
     rewrittenQuery: QueryRewrite
     answer: TroubleshootingResponse
+    debug: IncidentAnalyzeDebug | None = None
 
 
 class IngestResponse(BaseModel):
@@ -84,6 +114,7 @@ class IngestResponse(BaseModel):
     indexedChunks: int
     indexedByDocType: dict[str, int] = Field(default_factory=dict)
     emptySectionsMerged: int = 0
+    indexedFiles: list[str] = Field(default_factory=list)
 
 
 class FeedbackRequest(BaseModel):

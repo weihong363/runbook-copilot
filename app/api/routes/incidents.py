@@ -15,7 +15,16 @@ def analyzeIncident(request: IncidentAnalyzeRequest) -> IncidentAnalyzeResponse:
     try:
         store = SQLiteVectorStore(settings.databasePath)
         retriever = HybridRetriever(store, settings.vectorDimension)
-        entities, rewrittenQuery, answer = IncidentAnalyzer(retriever, settings.topK).analyze(request)
+        analyzer = IncidentAnalyzer(retriever, settings.topK)
+        if request.debug:
+            entities, rewrittenQuery, answer, debug = analyzer.analyzeWithDebug(request)
+            return IncidentAnalyzeResponse(
+                entities=entities,
+                rewrittenQuery=rewrittenQuery,
+                answer=answer,
+                debug=debug,
+            )
+        entities, rewrittenQuery, answer = analyzer.analyze(request)
     except Exception as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     return IncidentAnalyzeResponse(entities=entities, rewrittenQuery=rewrittenQuery, answer=answer)
