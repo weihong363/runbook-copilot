@@ -1,0 +1,17 @@
+spring:
+  application:
+    name: mock-service
+
+# 日志模拟器配置
+mock:
+  log:
+    # 日志输出间隔范围（毫秒）
+    interval:
+      min: 2000
+      max: 5000
+    # 错误日志概率百分比（0-100）
+    error-rate: 15
+
+# 服务器配置
+server:
+  port: 8080
