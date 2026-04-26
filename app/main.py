@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 
+from app.api.routes.debug import router as debugRouter
 from app.api.routes.feedback import router as feedbackRouter
 from app.api.routes.health import router as healthRouter
 from app.api.routes.incidents import router as incidentsRouter
@@ -16,6 +17,7 @@ def createApp() -> FastAPI:
     app.include_router(knowledgeRouter)
     app.include_router(incidentsRouter)
     app.include_router(feedbackRouter)
+    app.include_router(debugRouter)
     return app
 
 

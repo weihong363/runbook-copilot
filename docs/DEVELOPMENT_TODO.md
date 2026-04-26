@@ -271,22 +271,146 @@
 
 ### Milestone 10：产品化扩展
 
+状态：已完成首版。
+
+已完成：
+
+- [x] 接入真实 incident 来源的本地留存模型
+- [x] 增加通用监控/告警事件入口
+- [x] 增加简单调试页面
+- [x] 增加更完整的反馈闭环
+
+当前结论：
+
+- 先使用 `POST /api/incidents/events` 作为标准化 webhook 入口
+- 已接入首个具体平台入口：`POST /api/incidents/integrations/grafana`
+- analyze 和 event 入口都会写入本地 SQLite incidents 表
+- feedback 支持 `useful`、`reason`、列表和汇总
+- `GET /debug` 只作为本地 API demo，不作为正式前端
+
+决策记录：
+
+- [PRODUCTIZATION_DECISION.md](PRODUCTIZATION_DECISION.md)
+- [REAL_WORLD_SAMPLE_REPLAY.md](REAL_WORLD_SAMPLE_REPLAY.md)
+- [WEBHOOK_INTEGRATION_DECISION.md](WEBHOOK_INTEGRATION_DECISION.md)
+
+---
+
+### Milestone 11：Grafana 真实试用加固
+
+状态：建议下一步优先启动。
+
+目标：让 Grafana webhook 从“能接入”变成“能承接真实团队小范围试用”。
+
 TODO：
 
-- [ ] 接入真实 incident 来源
-- [ ] 接入监控平台或告警事件源
-- [ ] 增加简单前端或调试页面
-- [ ] 增加更完整的反馈闭环
+- [ ] 基于 `sourceType + sourceId + 时间窗口` 做 webhook 去重
+- [ ] 支持 Grafana `resolved` alert 更新已有 incident 状态，而不是只跳过
+- [ ] 增加 incident 状态流转：
+  - `analyzed`
+  - `resolved`
+  - `ignored`
+- [ ] 抽出 Grafana 字段映射配置，至少支持 service label 候选：
+  - `service`
+  - `service_name`
+  - `app`
+  - `job`
+  - `namespace`
+  - `component`
+- [ ] 增加真实 Grafana payload fixtures
+- [ ] 增加 HMAC 签名失败、timestamp 过期、resolved alert 的测试
+- [ ] README 增加 Grafana contact point 配置示例
 
-注意：
+验收标准：
 
-- 这些都不应该早于 retrieval 和评估闭环稳定完成
+- 同一个 Grafana firing alert 在短时间内不会重复生成多个 incident
+- resolved alert 能把对应 incident 标记为 `resolved`
+- 字段映射不需要改代码即可适配常见 label 命名
+- Grafana webhook 相关测试覆盖主路径和错误路径
+
+---
+
+### Milestone 12：反馈驱动知识库迭代
+
+状态：排在 Grafana 真实试用之后。
+
+目标：让 feedback 不只是统计分数，而是能直接指导知识库补齐。
+
+TODO：
+
+- [ ] 增加低分 feedback 查询接口
+- [ ] 增加 `useful=false` 按 `reason` 聚合接口
+- [ ] 增加 incident citation 路径统计
+- [ ] 增加“疑似缺知识库”报告脚本
+- [ ] 支持内部脱敏告警集：
+  - `app/evaluation/internal_alert_samples.jsonl`
+  - 或通过参数传入自定义 dataset
+- [ ] 为低分样本生成建议 runbook 文件名、tags 和章节骨架
+- [ ] README 增加 feedback 驱动知识库迭代流程
+
+验收标准：
+
+- 可以快速列出最近低分 incident
+- 可以看到低分原因聚合和缺失主题
+- 可以从低分样本生成可人工审核的 runbook 草稿建议
+
+---
+
+### Milestone 13：第二平台接入
+
+状态：等 Grafana 真实流量稳定后再启动。
+
+目标：在已有通用 event schema 稳定的基础上，接入第二个最常用告警来源。
+
+候选：
+
+- PagerDuty webhook
+- Prometheus Alertmanager 独立入口
+
+TODO：
+
+- [ ] 根据真实团队使用情况二选一，不同时接两个
+- [ ] 抽出统一 external event adapter 接口
+- [ ] 复用 `IncidentEventRequest`，避免为每个平台扩业务 schema
+- [ ] 增加平台签名/鉴权策略文档
+- [ ] 增加平台 payload fixtures 和端到端测试
+- [ ] 明确 resolved/acknowledged 状态如何映射到 incident 状态
+
+验收标准：
+
+- 第二平台入口能复用 analyze、incident store、feedback 闭环
+- 平台差异被限制在 adapter 层
+- 不破坏 Grafana 入口和通用 `/api/incidents/events`
+
+---
+
+### Milestone 14：生成层增强与 LLM 默认策略
+
+状态：等内部样本和 feedback 数据足够后再启动。
+
+目标：判断是否值得让真实 LLM 成为某些环境的默认回答生成器。
+
+TODO：
+
+- [ ] 用内部真实样本对比 `template` 与 `openai`
+- [ ] 增加 hallucination 回归测试
+- [ ] 增加 citation 绑定失败的 fixture
+- [ ] 增加 prompt version 升级策略
+- [ ] 记录每次 answer generation 的 provider、model、promptVersion
+- [ ] 明确哪些场景允许使用 LLM，哪些场景继续强制 template
+
+验收标准：
+
+- `answerUsefulness` 明显高于 template
+- `citationRelevance` 和 `schemaValidity` 不下降
+- 人工抽查确认没有无引用关键结论
+- LLM 只作为可配置选项启用，不直接全局默认
 
 ---
 
 ## 推荐执行顺序
 
-建议按以下顺序推进，而不是并行摊太开：
+已完成的主线：
 
 1. 检索质量加固
 2. incident 输入理解增强
@@ -294,7 +418,17 @@ TODO：
 4. 评估闭环扩充
 5. 知识库规范化
 6. 可调试性增强
-7. 再决定是否升级 embedding / vector store / reranker / LLM
+7. embedding / vector store 可选升级评估
+8. rerank 与多阶段检索
+9. 回答生成增强
+10. 产品化入口与反馈闭环
+
+接下来建议按以下顺序推进，而不是并行摊太开：
+
+1. Milestone 11：Grafana 真实试用加固
+2. Milestone 12：反馈驱动知识库迭代
+3. Milestone 13：第二平台接入
+4. Milestone 14：生成层增强与 LLM 默认策略
 
 ---
 
@@ -316,16 +450,32 @@ TODO：
 
 ### 第一轮
 
-- [ ] 扩展 entity extraction 字段
-- [ ] 引入 `keyword_query / semantic_query / filters`
-- [ ] 加 service / error_code / dependency 的 rerank 规则
-- [ ] 扩充 retrieval 测试
+- [x] 扩展 entity extraction 字段
+- [x] 引入 `keyword_query / semantic_query / filters`
+- [x] 加 service / error_code / dependency 的 rerank 规则
+- [x] 扩充 retrieval 测试
 
 ### 第二轮
 
-- [ ] 扩充评测集到 10+ 条
-- [ ] 加 hit@3 / hit@5
-- [ ] 补知识库编写规范
-- [ ] 增加 analyze debug 输出
+- [x] 扩充评测集到 10+ 条
+- [x] 加 hit@3 / hit@5
+- [x] 补知识库编写规范
+- [x] 增加 analyze debug 输出
 
 这两轮做完之后，再决定是否需要引入更重的底层能力。
+
+### 接下来两轮
+
+### 第三轮
+
+- [ ] webhook 去重
+- [ ] resolved alert 状态更新
+- [ ] Grafana 字段映射配置
+- [ ] Grafana payload fixtures
+
+### 第四轮
+
+- [ ] 低分 feedback 列表
+- [ ] useful=false reason 聚合
+- [ ] 缺失知识报告脚本
+- [ ] 内部脱敏告警样本支持

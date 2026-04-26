@@ -34,13 +34,33 @@ def initializeDatabase(databasePath: Path) -> None:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 incident_id TEXT,
                 rating INTEGER NOT NULL,
+                useful INTEGER,
+                reason TEXT,
                 comment TEXT,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS incidents (
+                id TEXT PRIMARY KEY,
+                source_type TEXT NOT NULL,
+                source_id TEXT,
+                alert_title TEXT NOT NULL,
+                service_name TEXT NOT NULL,
+                log_snippet TEXT NOT NULL,
+                symptom_description TEXT,
+                severity TEXT,
+                status TEXT NOT NULL DEFAULT 'analyzed',
+                labels TEXT NOT NULL DEFAULT '{}',
+                analysis TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
             """
         )
         _ensureColumn(connection, "chunks", "service", "TEXT NOT NULL DEFAULT ''")
         _ensureColumn(connection, "chunks", "heading_level", "INTEGER NOT NULL DEFAULT 0")
+        _ensureColumn(connection, "feedback", "useful", "INTEGER")
+        _ensureColumn(connection, "feedback", "reason", "TEXT")
 
 
 def _ensureColumn(connection: sqlite3.Connection, table: str, name: str, definition: str) -> None:

@@ -18,6 +18,7 @@ class Settings(BaseModel):
     answerGenerator: str = Field(default="template")
     answerPromptVersion: str = Field(default="grounded-v1")
     openaiModel: str = Field(default="gpt-5.2")
+    grafanaWebhookSecret: str | None = None
     topK: int = Field(default=5, ge=1, le=20)
 
 
@@ -39,6 +40,7 @@ def getSettings() -> Settings:
         answerGenerator=os.getenv("ANSWER_GENERATOR", "template"),
         answerPromptVersion=os.getenv("ANSWER_PROMPT_VERSION", "grounded-v1"),
         openaiModel=os.getenv("OPENAI_MODEL", "gpt-5.2"),
+        grafanaWebhookSecret=os.getenv("GRAFANA_WEBHOOK_SECRET") or None,
         topK=int(os.getenv("TOP_K", "5")),
     )
 

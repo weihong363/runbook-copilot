@@ -10,7 +10,7 @@
 - 使用 BM25 做关键词检索。
 - 合并向量和 BM25 结果，并基于服务名、错误码、依赖名和 section 标题做简单 rerank。
 - 默认使用模板生成 grounded answer，可选接入 OpenAI 做受 citation 约束的回答合成。
-- 提供反馈接口和离线 JSONL 评测脚本。
+- 提供通用告警事件入口、incident 本地留存、反馈接口和离线 JSONL 评测脚本。
 
 ## 架构
 
@@ -20,6 +20,7 @@ FastAPI routes
   -> rag/retriever.py
   -> rag/vector_store.py + rag/bm25.py
   -> llm/answer_generator.py
+  -> services/incident_store.py + services/feedback_service.py
   -> SQLite
 ```
 
@@ -30,6 +31,7 @@ FastAPI routes
 - `app/rag`：Markdown 分块、嵌入、向量存储、BM25 和混合检索。
 - `app/llm`：模板回答、可选 LLM 回答生成、prompt version 和 citation 绑定。
 - `app/services`：事故分析和反馈写入。
+- `app/static/debug.html`：极简 API 调试页面。
 - `app/evaluation`：离线评测脚本和样例数据。
 - `knowledge/`：本地知识库 Markdown。
 
@@ -38,7 +40,8 @@ FastAPI routes
 - 默认用可解释模板生成 grounded answer，确保离线可运行。
 - 可选接入 OpenAI Responses API 做 answer synthesis，但仍强制答案 citation 来自检索结果。
 - 向量检索使用确定性的哈希嵌入并存入 SQLite，避免首轮引入 Chroma/FAISS 的安装复杂度。后续可以替换为 Chroma、FAISS 或真实 embedding 模型。
-- 不加入 Docker、认证、后台任务和外部告警系统集成。
+- Milestone 10 只提供通用事件入口，不接具体 Grafana / Prometheus / PagerDuty SDK。
+- 不加入 Docker、认证、后台任务。
 
 ## 本地运行
 
@@ -91,6 +94,7 @@ curl -X POST http://127.0.0.1:8000/api/knowledge/ingest
 
 响应包含：
 
+- `incidentId`
 - `entities`：提取出的服务、依赖、异常类型、错误码、关键词和症状标签。
 - `rewrittenQuery.keywordQuery`：用于 BM25 的关键词检索查询。
 - `rewrittenQuery.semanticQuery`：用于向量召回的语义查询。
@@ -108,9 +112,86 @@ curl -X POST http://127.0.0.1:8000/api/knowledge/ingest
 - citation excerpt 会去掉 markdown 标题行，保留更稳定的正文片段
 - LLM 生成路径会二次校验 citations，只保留本次检索返回的 chunk
 
+分析结果会写入本地 SQLite 的 `incidents` 表，方便后续反馈和排查回看。
+
+### `POST /api/incidents/events`
+
+通用告警事件入口，给真实告警系统或脚本调用。当前不绑定具体平台，只接收标准化事件：
+
+```json
+{
+  "sourceType": "grafana-webhook",
+  "sourceId": "alert-123",
+  "alertTitle": "checkout-api HTTP 500 错误率升高",
+  "serviceName": "checkout-api",
+  "logSnippet": "HTTP 500 DB_POOL_EXHAUSTED timeout acquiring connection",
+  "severity": "critical",
+  "labels": {
+    "team": "checkout"
+  }
+}
+```
+
+该接口会复用 analyze 主流程，并把来源信息写入 incident 记录。
+
+### `POST /api/incidents/integrations/grafana`
+
+接收 Grafana Alerting / Alertmanager 风格 webhook payload，并将每条 `firing` alert 转成 incident event。
+
+当前支持：
+
+- `alerts[].labels.service` / `job` / `app` 映射为 `serviceName`
+- `alerts[].labels.alertname` 映射为告警名
+- `annotations.description` / `message` 映射为 `logSnippet`
+- `annotations.summary` 映射为 `symptomDescription`
+- `fingerprint` / `groupKey` 映射为 `sourceId`
+- `resolved` alert 会被跳过
+
+如果设置 `GRAFANA_WEBHOOK_SECRET`，接口会校验 Grafana HMAC 签名。
+
+### `GET /api/incidents`
+
+返回最近分析过的 incident：
+
+```bash
+curl "http://127.0.0.1:8000/api/incidents?limit=20"
+```
+
+### `GET /api/incidents/{incidentId}`
+
+返回单个 incident 的来源、基本信息和已生成答案。
+
 ### `POST /api/feedback`
 
 记录用户对答案的评分和备注。
+
+请求示例：
+
+```json
+{
+  "incidentId": "inc_xxx",
+  "rating": 4,
+  "useful": true,
+  "reason": "hit",
+  "comment": "命中文档正确"
+}
+```
+
+### `GET /api/feedback`
+
+按时间倒序返回反馈记录，支持按 incident 过滤：
+
+```bash
+curl "http://127.0.0.1:8000/api/feedback?incidentId=inc_xxx"
+```
+
+### `GET /api/feedback/summary`
+
+返回反馈总数、平均分、有用/无用数量：
+
+```bash
+curl "http://127.0.0.1:8000/api/feedback/summary?incidentId=inc_xxx"
+```
 
 ## 测试与评测
 
@@ -190,6 +271,14 @@ python scripts/lint_knowledge.py
 - [DEBUG_CHECKLIST.md](/Users/ironion/workspace/runbook-copilot/docs/DEBUG_CHECKLIST.md)
 - [RERANKER_DECISION.md](/Users/ironion/workspace/runbook-copilot/docs/RERANKER_DECISION.md)
 
+也可以打开极简调试页面：
+
+```text
+http://127.0.0.1:8000/debug
+```
+
+该页面只用于本地 API 验证，不是正式前端。
+
 ## 向量与 Embedding
 
 默认配置继续使用本地 `sqlite + hash embedding`，保证离线可运行：
@@ -245,10 +334,30 @@ python scripts/compare_answer_generators.py
 
 - [ANSWER_GENERATION_DECISION.md](/Users/ironion/workspace/runbook-copilot/docs/ANSWER_GENERATION_DECISION.md)
 
+## 产品化扩展
+
+Milestone 10 已加入最小产品闭环：
+
+- `POST /api/incidents/events`：通用告警事件入口
+- `GET /api/incidents` / `GET /api/incidents/{incidentId}`：incident 本地留存和回看
+- `POST /api/feedback`：支持 `useful` 和 `reason`
+- `GET /api/feedback` / `GET /api/feedback/summary`：反馈列表和汇总
+- `GET /debug`：极简本地调试页面
+
+当前决策记录见：
+
+- [PRODUCTIZATION_DECISION.md](/Users/ironion/workspace/runbook-copilot/docs/PRODUCTIZATION_DECISION.md)
+
+公开事故样本回放记录见：
+
+- [REAL_WORLD_SAMPLE_REPLAY.md](/Users/ironion/workspace/runbook-copilot/docs/REAL_WORLD_SAMPLE_REPLAY.md)
+- [WEBHOOK_INTEGRATION_DECISION.md](/Users/ironion/workspace/runbook-copilot/docs/WEBHOOK_INTEGRATION_DECISION.md)
+
 ## 后续路线
 
 - 在评测证明有收益后，再接入 Chroma/FAISS。
 - 扩展 LLM 生成评测集，并在 usefulness 明确提升后再切默认生成器。
+- 接入具体告警平台前，先稳定通用事件 schema 和 feedback 指标。
 - 扩展 Markdown frontmatter 元数据解析。
 - 增加历史事故数据集和 recall/precision 评测指标。
 - 增加更细粒度的服务过滤、文档类型过滤和可解释 rerank reason。
